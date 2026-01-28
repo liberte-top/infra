@@ -25,9 +25,9 @@ jobs:
       - name: Prepare SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.INFRA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.INFRA_SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Write inventory from secrets
         run: |
@@ -35,8 +35,8 @@ jobs:
           all:
             hosts:
               prod:
-                ansible_host: ${{ secrets.PROD_SSH_HOST }}
-                ansible_user: ${{ secrets.PROD_SSH_USER }}
+                ansible_host: ${{ secrets.INFRA_SSH_HOST }}
+                ansible_user: ${{ secrets.INFRA_SSH_USER }}
                 ansible_python_interpreter: /usr/bin/python3
           HOSTS
 
