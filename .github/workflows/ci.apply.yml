@@ -31,14 +31,9 @@ jobs:
 
       - name: Write inventory from secrets
         run: |
-          cat > inventories/production/hosts.yml <<'HOSTS'
-          all:
-            hosts:
-              prod:
-                ansible_host: ${{ secrets.INFRA_SSH_HOST }}
-                ansible_user: ${{ secrets.INFRA_SSH_USER }}
-                ansible_python_interpreter: /usr/bin/python3
-          HOSTS
+          INFRA_SSH_HOST="${{ secrets.INFRA_SSH_HOST }}"
+          INFRA_SSH_USER="${{ secrets.INFRA_SSH_USER }}"
+          envsubst < inventories/production/hosts.yml.tmpl > inventories/production/hosts.yml
 
       - name: Smoke apply (facts only)
         env:

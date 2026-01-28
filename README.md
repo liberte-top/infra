@@ -8,7 +8,7 @@ Ansible is the source of truth for base system dependencies and machine setup.
 - roles/: reusable roles
 
 ## Quick start
-1) Update `inventories/production/hosts.yml`
+1) Update `inventories/production/hosts.yml.tmpl`
 2) Adjust `group_vars/all.yml`
 3) Run:
    ansible-playbook playbooks/base.yml
