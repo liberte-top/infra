@@ -43,5 +43,7 @@ jobs:
       - name: Smoke apply (facts only)
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
+          ANSIBLE_STDOUT_CALLBACK: "default"
+          ANSIBLE_CALLBACK_RESULT_FORMAT: "yaml"
         run: |
           ansible-playbook playbooks/smoke.yml
