@@ -1,6 +1,0 @@
-- name: SSH hardening (P0)
-  hosts: all
-  serial: 1
-  become: true
-  roles:
-    - ssh

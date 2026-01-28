@@ -1,5 +1,0 @@
-- name: Base system dependencies
-  hosts: all
-  become: true
-  roles:
-    - base

@@ -1,3 +1,0 @@
-ssh_verify_connection: true
-ssh_verify_user: "{{ ssh_admin_user }}"
-ssh_verify_private_key_file: ""

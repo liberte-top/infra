@@ -1,0 +1,29 @@
+name: install
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment name"
+        type: string
+        required: false
+        default: "prod"
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.INFRA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.INFRA_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run install
+        run: |
+          ./install.sh

@@ -1,7 +1,0 @@
-base_packages: []
-ssh_admin_user: k8s_admin
-ssh_admin_groups:
-  - sudo
-ssh_admin_pubkey: ""
-ssh_root_login: "prohibit-password"
-ssh_password_auth: false
