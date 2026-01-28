@@ -31,8 +31,8 @@ jobs:
 
       - name: Write inventory from secrets
         run: |
-          INFRA_SSH_HOST="${{ secrets.INFRA_SSH_HOST }}"
-          INFRA_SSH_USER="${{ secrets.INFRA_SSH_USER }}"
+          export INFRA_SSH_HOST="${{ secrets.INFRA_SSH_HOST }}"
+          export INFRA_SSH_USER="${{ secrets.INFRA_SSH_USER }}"
           envsubst < inventories/production/hosts.yml.tmpl > inventories/production/hosts.yml
 
       - name: Smoke apply (facts only)
