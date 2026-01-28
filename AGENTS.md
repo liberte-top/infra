@@ -18,9 +18,9 @@
 
 # SSH (P0) Notes
 - Managed via GitHub Secrets:
-  - `PROD_SSH_PRIVATE_KEY` (SSH connect)
-  - `INFRA_K8S_ADMIN_PUBKEY` (authorized_keys for k8s_admin)
-- `ci.apply` runs `playbooks/ssh.yml` with the pubkey secret.
+  - `INFRA_SSH_{USER,HOST,PRIVATE_KEY}` = root channel for CI access
+  - `PROD_SSH_{USER,HOST,PRIVATE_KEY}` = k8s_admin channel
+- `ci.apply` derives the `k8s_admin` public key from `PROD_SSH_PRIVATE_KEY` via `ssh-keygen -y`.
 
 ## Playbook Risk Notes (Potential Principle Violations)
 - Record any risk that could break idempotency, observability, or auto-rollback.

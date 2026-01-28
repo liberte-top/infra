@@ -47,5 +47,9 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
         run: |
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > /tmp/k8s_admin_id_rsa
+          chmod 600 /tmp/k8s_admin_id_rsa
+          ssh-keygen -y -f /tmp/k8s_admin_id_rsa > /tmp/k8s_admin.pub
           ansible-playbook playbooks/ssh.yml \
-            -e "ssh_admin_pubkey=${{ secrets.INFRA_K8S_ADMIN_PUBKEY }}"
+            -e "ssh_admin_pubkey=$(cat /tmp/k8s_admin.pub)"
+          rm -f /tmp/k8s_admin_id_rsa /tmp/k8s_admin.pub
