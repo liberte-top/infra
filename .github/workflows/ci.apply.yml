@@ -1,0 +1,47 @@
+name: apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment name"
+        type: string
+        required: false
+        default: "prod"
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Write inventory from secrets
+        run: |
+          cat > inventories/production/hosts.yml <<'HOSTS'
+          all:
+            hosts:
+              prod:
+                ansible_host: ${{ secrets.PROD_SSH_HOST }}
+                ansible_user: ${{ secrets.PROD_SSH_USER }}
+                ansible_python_interpreter: /usr/bin/python3
+          HOSTS
+
+      - name: Smoke apply (facts only)
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          ansible-playbook playbooks/smoke.yml
