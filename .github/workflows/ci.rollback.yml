@@ -29,7 +29,6 @@ jobs:
           sudo apt-get install -y ansible
 
       - name: Rollback
-        working-directory: infra
         run: |
           ansible-playbook -i inventory/hosts.ini playbooks/rollback.yml \
             -e phase_from="${{ inputs.phase_from }}" \
