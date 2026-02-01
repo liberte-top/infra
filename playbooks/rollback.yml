@@ -21,8 +21,8 @@
         fail_msg: "phase_to must be in phase_order"
     - name: Resolve phase indices
       set_fact:
-        phase_from_idx: "{{ phase_order.index(phase_from) }}"
-        phase_to_idx: "{{ phase_order.index(phase_to) }}"
+        phase_from_idx: "{{ phase_order.index(phase_from) | int }}"
+        phase_to_idx: "{{ phase_order.index(phase_to) | int }}"
   tasks:
     - name: Rollback phases in reverse order
       include_tasks: "phases/phase_{{ item }}.yml"
@@ -32,4 +32,4 @@
       loop: "{{ phase_order | reverse | list }}"
       loop_control:
         index_var: phase_idx
-      when: (phase_order | length - 1 - phase_idx) >= phase_from_idx and (phase_order | length - 1 - phase_idx) <= phase_to_idx
+      when: ((phase_order | length - 1 - phase_idx) | int) >= (phase_from_idx | int) and ((phase_order | length - 1 - phase_idx) | int) <= (phase_to_idx | int)
