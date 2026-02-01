@@ -30,7 +30,7 @@
       loop: "{{ phase_order }}"
       loop_control:
         index_var: phase_idx
-      when: phase_idx <= phase_target_idx
+      when: (phase_idx | int) <= (phase_target_idx | int)
     - name: Output phase status
       debug:
         msg: "phase={{ item.key }} status={{ item.value }}"
