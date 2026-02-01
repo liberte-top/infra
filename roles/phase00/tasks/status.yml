@@ -14,10 +14,10 @@
   set_fact:
     phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
 
-- name: Check installed packages (dpkg)
-  command: "dpkg-query -W -f='${Status}\\n' {{ item }}"
+- name: Check installed packages (dpkg, batch)
+  command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_state.packages.desired | join(' ') }}"
   register: phase00_pkg_checks
-  loop: "{{ phase00_state.packages.desired if phase00_state is defined else [] }}"
+  when: phase00_state is defined
   failed_when: false
   changed_when: false
 
@@ -26,7 +26,7 @@
     phase00_packages_present: >-
       {{
         phase00_state is defined and
-        (phase00_pkg_checks.results | selectattr('stdout', 'search', 'install ok installed') | list | length == phase00_state.packages.desired | length)
+        (phase00_pkg_checks.stdout_lines | select('search', ' install ok installed$') | list | length == phase00_state.packages.desired | length)
       }}
 
 - name: Compute phase00 status value
