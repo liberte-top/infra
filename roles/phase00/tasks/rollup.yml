@@ -27,6 +27,7 @@
       - python3
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
