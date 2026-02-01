@@ -16,7 +16,7 @@ jobs:
   rollup:
     runs-on: ubuntu-latest
     container:
-      image: willhallonline/ansible:latest
+      image: willhallonline/ansible:2.18-alpine-3.22
     env:
       INFRA_HOST: ${{ secrets.INFRA_HOST }}
       INFRA_USER: ${{ secrets.INFRA_USER }}
