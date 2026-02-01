@@ -40,4 +40,4 @@
 
 - name: Set phase00 status
   set_fact:
-    phase_status: "{{ phase_status | default({}) | combine({ phase_id: phase00_status_value }) }}"
+    phase_status: "{{ (hostvars[inventory_hostname].phase_status | default({})) | combine({ phase_id: phase00_status_value }) }}"
