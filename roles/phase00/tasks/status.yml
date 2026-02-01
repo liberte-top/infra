@@ -14,13 +14,20 @@
   set_fact:
     phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
 
-- name: Gather package facts
-  package_facts:
-    manager: auto
+- name: Check installed packages (dpkg)
+  command: "dpkg-query -W -f='${Status}\\n' {{ item }}"
+  register: phase00_pkg_checks
+  loop: "{{ phase00_state.packages.desired if phase00_state is defined else [] }}"
+  failed_when: false
+  changed_when: false
 
 - name: Compute phase00 package readiness
   set_fact:
-    phase00_packages_present: "{{ phase00_state is defined and (phase00_state.packages.desired | difference(ansible_facts.packages.keys() | list) | length == 0) }}"
+    phase00_packages_present: >-
+      {{
+        phase00_state is defined and
+        (phase00_pkg_checks.results | selectattr('stdout', 'search', 'install ok installed') | list | length == phase00_state.packages.desired | length)
+      }}
 
 - name: Compute phase00 status value
   set_fact:
