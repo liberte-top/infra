@@ -20,7 +20,7 @@
         fail_msg: "phase_target must be in phase_order"
     - name: Resolve phase index
       set_fact:
-        phase_target_idx: "{{ phase_order.index(phase_target) }}"
+        phase_target_idx: "{{ phase_order.index(phase_target) | int }}"
   tasks:
     - name: Status phases up to target
       include_tasks: "phases/phase_{{ item }}.yml"
