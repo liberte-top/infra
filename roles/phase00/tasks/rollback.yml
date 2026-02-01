@@ -1,0 +1,29 @@
+---
+- name: Read phase00 state file
+  slurp:
+    src: /var/lib/infra/phase00.json
+  register: phase00_state_raw
+  ignore_errors: true
+
+- name: Parse phase00 state
+  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+  set_fact:
+    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+
+- name: Determine packages to remove
+  when: phase00_state is defined
+  set_fact:
+    phase00_remove:
+      "{{ phase00_state.packages.desired | difference(phase00_state.packages.pre_installed) }}"
+
+- name: Remove packages installed by phase00
+  when: phase00_remove is defined and phase00_remove | length > 0
+  apt:
+    name: "{{ phase00_remove }}"
+    state: absent
+    purge: false
+
+- name: Remove phase00 state file
+  file:
+    path: /var/lib/infra/phase00.json
+    state: absent

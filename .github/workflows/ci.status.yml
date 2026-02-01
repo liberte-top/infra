@@ -1,0 +1,31 @@
+name: ci.status
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase_target:
+        description: "Target phase (e.g. 00)"
+        required: true
+        default: "00"
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    env:
+      INFRA_HOST: ${{ secrets.INFRA_HOST }}
+      INFRA_USER: ${{ secrets.INFRA_USER }}
+      INFRA_PASSWORD: ${{ secrets.INFRA_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ansible
+
+      - name: Status
+        working-directory: infra
+        run: |
+          ansible-playbook -i inventory/hosts.ini playbooks/status.yml \
+            -e phase_target="${{ inputs.phase_target }}"

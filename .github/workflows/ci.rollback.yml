@@ -1,0 +1,36 @@
+name: ci.rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase_from:
+        description: "Start phase (e.g. 00)"
+        required: true
+        default: "00"
+      phase_to:
+        description: "End phase (e.g. 00)"
+        required: true
+        default: "00"
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    env:
+      INFRA_HOST: ${{ secrets.INFRA_HOST }}
+      INFRA_USER: ${{ secrets.INFRA_USER }}
+      INFRA_PASSWORD: ${{ secrets.INFRA_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ansible
+
+      - name: Rollback
+        working-directory: infra
+        run: |
+          ansible-playbook -i inventory/hosts.ini playbooks/rollback.yml \
+            -e phase_from="${{ inputs.phase_from }}" \
+            -e phase_to="${{ inputs.phase_to }}"

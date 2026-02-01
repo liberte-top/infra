@@ -1,0 +1,54 @@
+---
+- name: Ensure infra state dir
+  file:
+    path: /var/lib/infra
+    state: directory
+    mode: "0755"
+
+- name: Gather current package facts
+  package_facts:
+    manager: auto
+
+- name: Record pre-installed packages
+  set_fact:
+    phase00_pre_installed: "{{ ansible_facts.packages.keys() | list }}"
+
+- name: Install baseline packages
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - jq
+      - ufw
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+      - logrotate
+      - python3
+    state: present
+    update_cache: true
+
+- name: Build phase00 state
+  set_fact:
+    phase00_state:
+      phase: "00"
+      ok: true
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      packages:
+        desired:
+          - ca-certificates
+          - curl
+          - jq
+          - ufw
+          - gnupg
+          - lsb-release
+          - apt-transport-https
+          - logrotate
+          - python3
+        pre_installed: "{{ phase00_pre_installed }}"
+
+- name: Write phase00 state file
+  copy:
+    dest: /var/lib/infra/phase00.json
+    content: "{{ phase00_state | to_nice_json }}"
+    mode: "0644"

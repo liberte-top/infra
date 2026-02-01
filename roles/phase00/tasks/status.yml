@@ -1,0 +1,44 @@
+---
+- name: Compute precheck readiness
+  set_fact:
+    phase00_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_user_id == 'root') }}"
+
+- name: Read phase00 state file
+  slurp:
+    src: /var/lib/infra/phase00.json
+  register: phase00_state_raw
+  ignore_errors: true
+
+- name: Parse phase00 state
+  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+  set_fact:
+    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+
+- name: Gather package facts
+  package_facts:
+    manager: auto
+
+- name: Compute phase00 package readiness
+  set_fact:
+    phase00_packages_present: "{{ phase00_state is defined and (phase00_state.packages.desired | difference(ansible_facts.packages.keys() | list) | length == 0) }}"
+
+- name: Set phase00 status
+  set_fact:
+    phase_status: >-
+      {{
+        phase_status | default({}) | combine({
+          phase_id:
+            (
+              'pre-not-ready' if not phase00_pre_ready
+              else
+              (
+                'cur-success' if phase00_packages_present
+                else
+                (
+                  'cur-failed' if phase00_state is defined
+                  else 'pre-ready'
+                )
+              )
+            )
+        })
+      }}

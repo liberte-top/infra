@@ -1,0 +1,35 @@
+---
+- name: Rollup phases
+  hosts: infra
+  gather_facts: true
+  become: true
+  vars:
+    ansible_host: "{{ lookup('env', 'INFRA_HOST') }}"
+    ansible_user: "{{ lookup('env', 'INFRA_USER') | default('root', true) }}"
+    ansible_password: "{{ lookup('env', 'INFRA_PASSWORD') }}"
+    phase_order: ["00", "01"]
+  pre_tasks:
+    - name: Validate phase_from
+      assert:
+        that:
+          - phase_from in phase_order
+        fail_msg: "phase_from must be in phase_order"
+    - name: Validate phase_to
+      assert:
+        that:
+          - phase_to in phase_order
+        fail_msg: "phase_to must be in phase_order"
+    - name: Resolve phase indices
+      set_fact:
+        phase_from_idx: "{{ phase_order.index(phase_from) }}"
+        phase_to_idx: "{{ phase_order.index(phase_to) }}"
+  tasks:
+    - name: Rollup phases in order
+      include_tasks: "phases/phase_{{ item }}.yml"
+      vars:
+        phase_id: "{{ item }}"
+        phase_mode: "rollup"
+      loop: "{{ phase_order }}"
+      loop_control:
+        index_var: phase_idx
+      when: phase_idx >= phase_from_idx and phase_idx <= phase_to_idx

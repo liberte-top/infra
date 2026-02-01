@@ -1,0 +1,4 @@
+---
+- name: phase01 status placeholder
+  set_fact:
+    phase_status: "{{ phase_status | default({}) | combine({ phase_id: 'pre-not-ready' }) }}"

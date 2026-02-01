@@ -1,0 +1,7 @@
+---
+- name: Phase 00
+  include_role:
+    name: phase00
+    tasks_from: "{{ phase_mode }}"
+  vars:
+    phase_id: "{{ phase_id }}"

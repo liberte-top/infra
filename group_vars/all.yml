@@ -1,0 +1,21 @@
+---
+phase_from: "00"
+phase_to: "01"
+
+k3s_admin_user: "k3s_admin"
+k3s_admin_pubkey: ""
+
+ssh_allow_users:
+  - "k3s_admin"
+
+k3s_version_lock: "latest"
+
+ufw_allow_ports:
+  - 22
+  - 80
+  - 443
+  - 6443
+
+log_retention_days: 1
+image_retention_days: 1
+image_retention_count: 3
