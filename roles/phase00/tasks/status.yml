@@ -1,7 +1,7 @@
 ---
 - name: Compute precheck readiness
   set_fact:
-    phase00_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_user_id == 'root') }}"
+    phase00_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
 - name: Read phase00 state file
   slurp:
@@ -22,23 +22,22 @@
   set_fact:
     phase00_packages_present: "{{ phase00_state is defined and (phase00_state.packages.desired | difference(ansible_facts.packages.keys() | list) | length == 0) }}"
 
+- name: Compute phase00 status value
+  set_fact:
+    phase00_status_value: >-
+      {{
+        'pre-not-ready' if not phase00_pre_ready
+        else
+        (
+          'cur-success' if phase00_packages_present
+          else
+          (
+            'cur-failed' if phase00_state is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
 - name: Set phase00 status
   set_fact:
-    phase_status: >-
-      {{
-        phase_status | default({}) | combine({
-          phase_id:
-            (
-              'pre-not-ready' if not phase00_pre_ready
-              else
-              (
-                'cur-success' if phase00_packages_present
-                else
-                (
-                  'cur-failed' if phase00_state is defined
-                  else 'pre-ready'
-                )
-              )
-            )
-        })
-      }}
+    phase_status: "{{ phase_status | default({}) | combine({ phase_id: phase00_status_value }) }}"
