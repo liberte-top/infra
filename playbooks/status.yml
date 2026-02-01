@@ -30,4 +30,4 @@
     - name: Output phase status
       debug:
         msg: "phase={{ item.key }} status={{ item.value }}"
-      loop: "{{ (phase_status | default({})) | dict2items }}"
+      loop: "{{ (phase_status_map | default({})) | dict2items }}"
