@@ -1,7 +1,7 @@
 ---
 - name: Rollup phases
   hosts: infra
-  gather_facts: true
+  gather_facts: false
   become: true
   vars:
     ansible_host: "{{ lookup('env', 'INFRA_HOST') }}"

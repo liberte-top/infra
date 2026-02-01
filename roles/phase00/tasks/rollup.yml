@@ -28,12 +28,17 @@
     state: present
     update_cache: true
 
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase00_now
+  changed_when: false
+
 - name: Build phase00 state
   set_fact:
     phase00_state:
       phase: "00"
       ok: true
-      timestamp: "{{ ansible_date_time.iso8601 }}"
+      timestamp: "{{ phase00_now.stdout }}"
       packages:
         desired:
           - ca-certificates

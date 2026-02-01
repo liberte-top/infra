@@ -1,7 +1,7 @@
 ---
 - name: Status phases
   hosts: infra
-  gather_facts: true
+  gather_facts: false
   become: true
   vars:
     ansible_host: "{{ lookup('env', 'INFRA_HOST') }}"
@@ -9,6 +9,10 @@
     ansible_password: "{{ lookup('env', 'INFRA_PASSWORD') }}"
     phase_order: ["00", "01"]
   pre_tasks:
+    - name: Collect minimal facts
+      setup:
+        gather_subset:
+          - min
     - name: Validate phase_target
       assert:
         that:
