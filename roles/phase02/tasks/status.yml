@@ -64,6 +64,8 @@
   set_fact:
     phase02_ufw_ports_ok: "{{ phase02_ufw_ports_ok and ((item | string) ~ '/tcp') in phase02_ufw_status.stdout }}"
   loop: "{{ ufw_allow_ports }}"
+  loop_control:
+    loop_var: ufw_port
 
 - name: Check UFW limit ports
   set_fact:
@@ -77,16 +79,21 @@
       }}
 
 - name: Read sysctl values
-  command: "sysctl -n {{ item.key }}"
+  command: "sysctl -n {{ sysctl_item.key }}"
   register: phase02_sysctl_reads
   changed_when: false
   failed_when: false
   loop: "{{ liberte_sysctl | dict2items }}"
+  loop_control:
+    loop_var: sysctl_item
 
-- name: Compute sysctl readiness
+- name: Compute sysctl expected/actual
   set_fact:
     phase02_sysctl_expected: "{{ phase02_sysctl_reads.results | map(attribute='item') | map(attribute='value') | map('string') | list }}"
     phase02_sysctl_actual: "{{ phase02_sysctl_reads.results | map(attribute='stdout') | list }}"
+
+- name: Compute sysctl readiness
+  set_fact:
     phase02_sysctl_ok: >-
       {{
         (phase02_sysctl_reads.results | selectattr('rc','eq',0) | list | length) == (liberte_sysctl | length)
