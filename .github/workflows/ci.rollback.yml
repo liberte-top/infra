@@ -12,6 +12,10 @@ on:
         required: true
         default: "00"
 
+concurrency:
+  group: infra-phase-serial
+  cancel-in-progress: false
+
 jobs:
   rollback:
     runs-on: ubuntu-latest
