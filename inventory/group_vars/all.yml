@@ -1,6 +1,6 @@
 ---
 phase_from: "00"
-phase_to: "02"
+phase_to: "03"
 
 k3s_admin_user: "k8s-admin"
 k3s_admin_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQmu8HWUWrTLAdGCeLZelsgRCQWSLWVRAX5dB4d7Nm zqxy123@ZQXY123deMacBook-Pro.local"
@@ -11,7 +11,8 @@ ssh_allow_users:
   - "root"
   - "k8s-admin"
 
-k3s_version_lock: "latest"
+k3s_version_lock: "stable"
+k3s_etcd_snapshot_retention: 1
 
 ufw_allow_ports:
   - 22

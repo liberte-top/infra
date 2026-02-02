@@ -1,0 +1,58 @@
+---
+- name: Stop k3s service
+  service:
+    name: k3s
+    state: stopped
+  failed_when: false
+
+- name: Uninstall k3s
+  command: /usr/local/bin/k3s-uninstall.sh
+  changed_when: false
+  failed_when: false
+
+- name: Remove k3s config and data
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s
+    - /var/lib/kubelet
+    - /var/lib/cni
+    - /etc/cni
+
+- name: Remove admin kubeconfig
+  file:
+    path: "/home/{{ k3s_admin_user }}/.kube/config"
+    state: absent
+
+- name: Remove k3s sysctl settings
+  file:
+    path: /etc/sysctl.d/99-k3s.conf
+    state: absent
+
+- name: Apply sysctl settings
+  command: sysctl --system
+  register: phase03_sysctl_apply
+  changed_when: false
+
+- name: Ensure UFW forward policy reset
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^DEFAULT_FORWARD_POLICY='
+    line: 'DEFAULT_FORWARD_POLICY="DROP"'
+    create: false
+
+- name: Set UFW default routed policy deny
+  ufw:
+    direction: routed
+    policy: deny
+
+- name: Reload UFW
+  command: ufw reload
+  changed_when: false
+
+- name: Remove phase03 state file
+  file:
+    path: /var/lib/infra/phase/03/state.json
+    state: absent

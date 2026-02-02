@@ -1,0 +1,84 @@
+---
+- name: Compute precheck readiness
+  set_fact:
+    phase03_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
+
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase03 state dir
+  file:
+    path: /var/lib/infra/phase/03
+    state: directory
+    mode: "0755"
+
+- name: Read phase03 state file
+  slurp:
+    src: /var/lib/infra/phase/03/state.json
+  register: phase03_state_raw
+  ignore_errors: true
+
+- name: Parse phase03 state
+  when: phase03_state_raw is defined and phase03_state_raw.content is defined
+  set_fact:
+    phase03_state: "{{ phase03_state_raw.content | b64decode | from_json }}"
+
+- name: Capture k3s service status
+  command: systemctl is-active k3s
+  register: phase03_k3s_service
+  changed_when: false
+  failed_when: false
+
+- name: Read k3s version
+  command: /usr/local/bin/k3s --version
+  register: phase03_k3s_version_raw
+  changed_when: false
+  failed_when: false
+
+- name: Check node readiness
+  command: /usr/local/bin/kubectl get nodes --no-headers
+  register: phase03_k3s_nodes
+  changed_when: false
+  failed_when: false
+
+- name: Compute k3s readiness
+  set_fact:
+    phase03_k3s_ready: >-
+      {{
+        (phase03_k3s_service.stdout | default('')) == 'active'
+        and ' Ready ' in (' ' ~ (phase03_k3s_nodes.stdout | default('')) ~ ' ')
+      }}
+
+- name: Compute phase03 status value
+  set_fact:
+    phase03_status_value: >-
+      {{
+        'pre-not-ready' if not phase03_pre_ready
+        else
+        (
+          'cur-success' if phase03_k3s_ready
+          else
+          (
+            'cur-failed' if phase03_state is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
+- name: Set phase03 status
+  set_fact:
+    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase03_status_value }) }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase03_status_now
+  changed_when: false
+
+- name: Write phase03 status file
+  copy:
+    dest: /var/lib/infra/phase/03/status.json
+    content: "{{ {'phase': '03', 'status': phase03_status_value, 'timestamp': phase03_status_now.stdout} | to_nice_json }}"
+    mode: "0644"

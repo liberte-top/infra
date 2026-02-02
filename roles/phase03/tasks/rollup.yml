@@ -1,0 +1,159 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase03 state dir
+  file:
+    path: /var/lib/infra/phase/03
+    state: directory
+    mode: "0755"
+
+- name: Ensure br_netfilter module is loaded
+  command: modprobe br_netfilter
+  changed_when: false
+  failed_when: false
+
+- name: Install k3s sysctl settings
+  copy:
+    dest: /etc/sysctl.d/99-k3s.conf
+    content: |-
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Apply sysctl settings
+  command: sysctl --system
+  register: phase03_sysctl_apply
+  changed_when: false
+
+- name: Ensure UFW forward policy
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^DEFAULT_FORWARD_POLICY='
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+    create: false
+
+- name: Set UFW default routed policy allow
+  ufw:
+    direction: routed
+    policy: allow
+
+- name: Reload UFW
+  command: ufw reload
+  changed_when: false
+
+- name: Check k3s binary
+  stat:
+    path: /usr/local/bin/k3s
+  register: phase03_k3s_bin
+
+- name: Read installed k3s version
+  command: /usr/local/bin/k3s --version
+  register: phase03_k3s_version_raw
+  changed_when: false
+  failed_when: false
+  when: phase03_k3s_bin.stat.exists
+
+- name: Parse installed k3s version
+  set_fact:
+    phase03_k3s_installed_version: "{{ phase03_k3s_version_raw.stdout | regex_search('v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+') }}"
+  when: phase03_k3s_version_raw is defined and phase03_k3s_version_raw.stdout is defined
+
+- name: Fetch k3s release channels
+  uri:
+    url: https://update.k3s.io/v1-release/channels
+    return_content: true
+  register: phase03_k3s_channels
+  when: phase03_k3s_installed_version is not defined and k3s_version_lock in ['stable', 'latest']
+
+- name: Resolve stable k3s version
+  set_fact:
+    phase03_k3s_stable_version: "{{ (phase03_k3s_channels.content | from_json).data | selectattr('id', 'eq', 'stable') | map(attribute='latest') | first }}"
+  when: phase03_k3s_channels is defined and phase03_k3s_channels.content is defined
+
+- name: Resolve desired k3s version
+  set_fact:
+    phase03_k3s_version_resolved: >-
+      {{
+        phase03_k3s_installed_version
+        if (phase03_k3s_installed_version is defined and phase03_k3s_installed_version | length > 0)
+        else (
+          phase03_k3s_stable_version
+          if (k3s_version_lock in ['stable', 'latest'])
+          else k3s_version_lock
+        )
+      }}
+
+- name: Install k3s server
+  shell: >-
+    curl -sfL https://get.k3s.io |
+    INSTALL_K3S_VERSION="{{ phase03_k3s_version_resolved }}"
+    INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}"
+    sh -
+  args:
+    creates: /usr/local/bin/k3s
+  when: phase03_k3s_version_resolved is defined and (phase03_k3s_installed_version | default('')) != phase03_k3s_version_resolved
+
+- name: Ensure k3s service is enabled and started
+  service:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Ensure admin kubeconfig directory
+  file:
+    path: "/home/{{ k3s_admin_user }}/.kube"
+    state: directory
+    owner: "{{ k3s_admin_user }}"
+    group: "{{ k3s_admin_user }}"
+    mode: "0700"
+
+- name: Copy kubeconfig for admin user
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ k3s_admin_user }}/.kube/config"
+    owner: "{{ k3s_admin_user }}"
+    group: "{{ k3s_admin_user }}"
+    mode: "0600"
+    remote_src: true
+
+- name: Check k3s node status
+  command: /usr/local/bin/kubectl get nodes
+  register: phase03_k3s_nodes
+  changed_when: false
+  failed_when: false
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase03_now
+  changed_when: false
+
+- name: Build phase03 state
+  set_fact:
+    phase03_state:
+      phase: "03"
+      ok: true
+      timestamp: "{{ phase03_now.stdout }}"
+      k3s:
+        version: "{{ phase03_k3s_version_resolved | default('unknown') }}"
+        installed_version: "{{ phase03_k3s_installed_version | default('unknown') }}"
+        api_access: "ssh-only"
+        addons: "default"
+        cni: "flannel"
+        etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
+      ufw:
+        routed_policy: "allow"
+      kubeconfig:
+        path: "/home/{{ k3s_admin_user }}/.kube/config"
+
+- name: Write phase03 state file
+  copy:
+    dest: /var/lib/infra/phase/03/state.json
+    content: "{{ phase03_state | to_nice_json }}"
+    mode: "0644"
