@@ -78,7 +78,7 @@
   failed_when: false
   when: phase02_state is defined
 
-- name: Compute phase02 short-circuit readiness
+- name: Compute phase02 sysctl readiness
   when: phase02_state is defined
   set_fact:
     phase02_sysctl_ok: >-
@@ -96,6 +96,10 @@
           (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
         )
       }}
+
+- name: Compute phase02 ufw readiness
+  when: phase02_state is defined
+  set_fact:
     phase02_ufw_defaults_ok: >-
       {{
         phase02_ufw_verbose.stdout is defined and
@@ -108,6 +112,10 @@
         (phase02_ufw_allow_check.rc | default(1)) == 0 and
         (phase02_ufw_limit_check.rc | default(0)) == 0
       }}
+
+- name: Compute phase02 state match
+  when: phase02_state is defined
+  set_fact:
     phase02_state_matches: >-
       {{
         (phase02_state.phase | default('')) == '02' and
@@ -117,6 +125,10 @@
         (phase02_state.ufw.ipv6_enabled | default(false)) == ufw_ipv6_enabled and
         (phase02_state.sysctl | default({})) == liberte_sysctl
       }}
+
+- name: Compute phase02 ready flag
+  when: phase02_state is defined
+  set_fact:
     phase02_ready: >-
       {{
         phase02_state_matches and

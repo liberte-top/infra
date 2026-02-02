@@ -50,7 +50,7 @@
   failed_when: false
   when: phase01_state is defined
 
-- name: Compute phase01 short-circuit readiness
+- name: Compute phase01 key/sshd readiness
   when: phase01_state is defined
   set_fact:
     phase01_root_key_present: >-
@@ -76,6 +76,10 @@
         ('allowusers root' in phase01_sshd_effective.stdout) and
         ('allowusers ' ~ k3s_admin_user in phase01_sshd_effective.stdout)
       }}
+
+- name: Compute phase01 state match
+  when: phase01_state is defined
+  set_fact:
     phase01_state_matches: >-
       {{
         (phase01_state.phase | default('')) == '01' and
@@ -83,6 +87,10 @@
         (phase01_state.users.admin_pubkey | default('')) == k3s_admin_pubkey and
         (phase01_state.ssh.allow_users | default([])) == ssh_allow_users
       }}
+
+- name: Compute phase01 ready flag
+  when: phase01_state is defined
+  set_fact:
     phase01_ready: >-
       {{
         phase01_state_matches and
