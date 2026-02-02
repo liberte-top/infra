@@ -11,6 +11,58 @@
     state: directory
     mode: "0755"
 
+- name: Define baseline packages
+  set_fact:
+    phase00_desired_packages:
+      - ca-certificates
+      - curl
+      - jq
+      - ufw
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+      - logrotate
+      - python3
+
+- name: Read phase00 state file
+  slurp:
+    src: /var/lib/infra/phase/00/state.json
+  register: phase00_state_raw
+  ignore_errors: true
+
+- name: Parse phase00 state
+  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+  set_fact:
+    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+
+- name: Check baseline packages installed
+  command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_desired_packages | join(' ') }}"
+  register: phase00_pkg_checks
+  changed_when: false
+  failed_when: false
+  when: phase00_state is defined
+
+- name: Compute phase00 short-circuit readiness
+  when: phase00_state is defined
+  set_fact:
+    phase00_packages_ok: >-
+      {{
+        phase00_pkg_checks.stdout_lines is defined and
+        (phase00_pkg_checks.stdout_lines | select('search', ' install ok installed$') | list | length
+          == (phase00_desired_packages | length))
+      }}
+    phase00_state_matches: >-
+      {{
+        phase00_state is defined and
+        (phase00_state.phase | default('')) == '00' and
+        (phase00_state.packages.desired | default([])) == phase00_desired_packages
+      }}
+    phase00_skip: "{{ phase00_packages_ok and phase00_state_matches }}"
+
+- name: Skip phase00 rollup when already ready
+  meta: end_role
+  when: phase00_skip | default(false)
+
 - name: Gather current package facts
   package_facts:
     manager: auto

@@ -11,6 +11,91 @@
     state: directory
     mode: "0755"
 
+- name: Read phase01 state file
+  slurp:
+    src: /var/lib/infra/phase/01/state.json
+  register: phase01_state_raw
+  ignore_errors: true
+
+- name: Parse phase01 state
+  when: phase01_state_raw is defined and phase01_state_raw.content is defined
+  set_fact:
+    phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
+
+- name: Check admin user exists
+  command: "getent passwd {{ k3s_admin_user }}"
+  register: phase01_admin_user_check
+  changed_when: false
+  failed_when: false
+  when: phase01_state is defined
+
+- name: Slurp root authorized_keys
+  slurp:
+    src: /root/.ssh/authorized_keys
+  register: phase01_root_keys
+  ignore_errors: true
+  when: phase01_state is defined
+
+- name: Slurp admin authorized_keys
+  slurp:
+    src: "/home/{{ k3s_admin_user }}/.ssh/authorized_keys"
+  register: phase01_admin_keys
+  ignore_errors: true
+  when: phase01_state is defined
+
+- name: Check effective sshd settings
+  command: "sshd -T -C user=root"
+  register: phase01_sshd_effective
+  changed_when: false
+  failed_when: false
+  when: phase01_state is defined
+
+- name: Compute phase01 short-circuit readiness
+  when: phase01_state is defined
+  set_fact:
+    phase01_root_key_present: >-
+      {{
+        phase01_root_keys is defined and phase01_root_keys.content is defined and
+        ((phase01_root_keys.content | b64decode) | trim | length > 0)
+      }}
+    phase01_admin_key_present: >-
+      {{
+        phase01_admin_keys is defined and phase01_admin_keys.content is defined and
+        (phase01_admin_keys.content | b64decode).find(k3s_admin_pubkey) != -1
+      }}
+    phase01_sshd_ok: >-
+      {{
+        phase01_sshd_effective.stdout is defined and
+        (
+          ('permitrootlogin prohibit-password' in phase01_sshd_effective.stdout) or
+          ('permitrootlogin without-password' in phase01_sshd_effective.stdout)
+        ) and
+        ('passwordauthentication no' in phase01_sshd_effective.stdout) and
+        ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and
+        ('pubkeyauthentication yes' in phase01_sshd_effective.stdout) and
+        ('allowusers root' in phase01_sshd_effective.stdout) and
+        ('allowusers ' ~ k3s_admin_user in phase01_sshd_effective.stdout)
+      }}
+    phase01_state_matches: >-
+      {{
+        (phase01_state.phase | default('')) == '01' and
+        (phase01_state.users.admin_user | default('')) == k3s_admin_user and
+        (phase01_state.users.admin_pubkey | default('')) == k3s_admin_pubkey and
+        (phase01_state.ssh.allow_users | default([])) == ssh_allow_users
+      }}
+    phase01_skip: >-
+      {{
+        phase01_state_matches and
+        (phase01_admin_user_check.rc == 0) and
+        phase01_root_key_present and
+        phase01_admin_key_present and
+        phase01_sshd_ok
+      }}
+
+- name: Skip phase01 rollup when already ready
+  meta: end_role
+  when: phase01_skip | default(false)
+
 - name: Ensure admin user
   user:
     name: "{{ k3s_admin_user }}"

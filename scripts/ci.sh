@@ -53,7 +53,7 @@ while [ $# -gt 0 ]; do
   esac
  done
 
-infra_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/infra"
+infra_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [ ! -d "$infra_root/.git" ]; then
   echo "infra repo not found at $infra_root" >&2

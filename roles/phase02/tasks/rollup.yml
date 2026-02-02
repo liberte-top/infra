@@ -11,6 +11,124 @@
     state: directory
     mode: "0755"
 
+- name: Read phase02 state file
+  slurp:
+    src: /var/lib/infra/phase/02/state.json
+  register: phase02_state_raw
+  ignore_errors: true
+
+- name: Parse phase02 state
+  when: phase02_state_raw is defined and phase02_state_raw.content is defined
+  set_fact:
+    phase02_state: "{{ phase02_state_raw.content | b64decode | from_json }}"
+
+- name: Check UFW status verbose
+  command: ufw status verbose
+  register: phase02_ufw_verbose
+  changed_when: false
+  failed_when: false
+  when: phase02_state is defined
+
+- name: Check UFW rules (numbered)
+  command: ufw status numbered
+  register: phase02_ufw_numbered
+  changed_when: false
+  failed_when: false
+  when: phase02_state is defined
+
+- name: Check UFW allow ports
+  shell: |
+    set -e
+    ports="{{ (ufw_allow_ports | difference(ufw_limit_ports | default([]))) | join(' ') }}"
+    if [ -z "$ports" ]; then
+      exit 0
+    fi
+    for port in $ports; do
+      ufw status numbered | grep -Eq "\\b${port}/tcp\\b.*ALLOW IN" || exit 1
+    done
+  args:
+    executable: /bin/bash
+  register: phase02_ufw_allow_check
+  changed_when: false
+  failed_when: false
+  when: phase02_state is defined
+
+- name: Check UFW limit ports
+  shell: |
+    set -e
+    ports="{{ (ufw_limit_ports | default([])) | join(' ') }}"
+    if [ -z "$ports" ]; then
+      exit 0
+    fi
+    for port in $ports; do
+      ufw status numbered | grep -Eq "\\b${port}/tcp\\b.*LIMIT IN" || exit 1
+    done
+  args:
+    executable: /bin/bash
+  register: phase02_ufw_limit_check
+  changed_when: false
+  failed_when: false
+  when: phase02_state is defined
+
+- name: Check sysctl values
+  command: "sysctl -n {{ item.key }}"
+  loop: "{{ liberte_sysctl | dict2items | sort(attribute='key') }}"
+  register: phase02_sysctl_checks
+  changed_when: false
+  failed_when: false
+  when: phase02_state is defined
+
+- name: Compute phase02 short-circuit readiness
+  when: phase02_state is defined
+  set_fact:
+    phase02_sysctl_ok: >-
+      {{
+        phase02_sysctl_checks.results is defined and
+        (phase02_sysctl_checks.results | selectattr('rc', 'equalto', 0) | list | length
+          == (liberte_sysctl | length)) and
+        (
+          phase02_sysctl_checks.results
+          | map(attribute='stdout')
+          | list
+          | map('trim')
+          | list
+          ==
+          (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
+        )
+      }}
+    phase02_ufw_defaults_ok: >-
+      {{
+        phase02_ufw_verbose.stdout is defined and
+        ('Status: active' in phase02_ufw_verbose.stdout) and
+        ('Default: deny (incoming), allow (outgoing), deny (routed)' in phase02_ufw_verbose.stdout) and
+        ('Logging: ' ~ ufw_logging in phase02_ufw_verbose.stdout)
+      }}
+    phase02_ufw_rules_ok: >-
+      {{
+        (phase02_ufw_allow_check.rc | default(1)) == 0 and
+        (phase02_ufw_limit_check.rc | default(0)) == 0
+      }}
+    phase02_state_matches: >-
+      {{
+        (phase02_state.phase | default('')) == '02' and
+        (phase02_state.ufw.allow_ports | default([])) == ufw_allow_ports and
+        (phase02_state.ufw.limit_ports | default([])) == (ufw_limit_ports | default([])) and
+        (phase02_state.ufw.logging | default('')) == ufw_logging and
+        (phase02_state.ufw.ipv6_enabled | default(false)) == ufw_ipv6_enabled and
+        (phase02_state.sysctl | default({})) == liberte_sysctl
+      }}
+    phase02_skip: >-
+      {{
+        phase02_state_matches and
+        phase02_ufw_defaults_ok and
+        phase02_ufw_rules_ok and
+        phase02_sysctl_ok
+      }}
+
+- name: Skip phase02 rollup when already ready
+  meta: end_role
+  when: phase02_skip | default(false)
+
 - name: Configure UFW IPv6 setting
   lineinfile:
     path: /etc/default/ufw
