@@ -124,10 +124,13 @@
     remote_src: true
 
 - name: Check k3s node status
-  command: /usr/local/bin/kubectl get nodes
+  command: /usr/local/bin/kubectl get nodes --request-timeout=20s
   register: phase03_k3s_nodes
   changed_when: false
   failed_when: false
+  retries: 6
+  delay: 10
+  until: phase03_k3s_nodes.rc == 0
 
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ

@@ -39,10 +39,13 @@
   failed_when: false
 
 - name: Check node readiness
-  command: /usr/local/bin/kubectl get nodes --no-headers
+  command: /usr/local/bin/kubectl get nodes --no-headers --request-timeout=20s
   register: phase03_k3s_nodes
   changed_when: false
   failed_when: false
+  retries: 6
+  delay: 10
+  until: phase03_k3s_nodes.rc == 0
 
 - name: Compute k3s readiness
   set_fact:
