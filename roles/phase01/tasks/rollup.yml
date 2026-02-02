@@ -58,18 +58,15 @@
     path: /etc/ssh/sshd_config.d/99-bootstrap.conf
   register: phase01_bootstrap_99
 
-- name: Check bootstrap sshd config (90-bootstrap)
-  stat:
-    path: /etc/ssh/sshd_config.d/90-bootstrap.conf
-  register: phase01_bootstrap_90
+- name: Require bootstrap sshd config (99-bootstrap)
+  assert:
+    that:
+      - phase01_bootstrap_99.stat.exists
+    fail_msg: "Missing required /etc/ssh/sshd_config.d/99-bootstrap.conf"
 
 - name: Select bootstrap config path
   set_fact:
-    phase01_bootstrap_path: >-
-      {{
-        '/etc/ssh/sshd_config.d/99-bootstrap.conf' if phase01_bootstrap_99.stat.exists
-        else ('/etc/ssh/sshd_config.d/90-bootstrap.conf' if phase01_bootstrap_90.stat.exists else '')
-      }}
+    phase01_bootstrap_path: /etc/ssh/sshd_config.d/99-bootstrap.conf
 
 - name: Slurp bootstrap sshd config
   when: phase01_bootstrap_path != ''
