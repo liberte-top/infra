@@ -1,4 +1,72 @@
 ---
-- name: phase01 rollback placeholder
-  debug:
-    msg: "phase01 rollback: TODO"
+- name: Remove admin authorized key
+  authorized_key:
+    user: "{{ k3s_admin_user }}"
+    key: "{{ k3s_admin_pubkey }}"
+    state: absent
+  ignore_errors: true
+
+- name: Remove root authorized key
+  authorized_key:
+    user: root
+    key: "{{ root_pubkey }}"
+    state: absent
+  ignore_errors: true
+
+- name: Remove admin sudoers
+  file:
+    path: "/etc/sudoers.d/90-{{ k3s_admin_user }}"
+    state: absent
+
+- name: Remove admin user
+  user:
+    name: "{{ k3s_admin_user }}"
+    state: absent
+    remove: true
+
+- name: Check sshd config backup
+  stat:
+    path: /var/lib/infra/phase01_sshd_config.bak
+  register: phase01_sshd_backup
+
+- name: Restore sshd config from backup
+  when: phase01_sshd_backup.stat.exists
+  copy:
+    src: /var/lib/infra/phase01_sshd_config.bak
+    dest: /etc/ssh/sshd_config
+    remote_src: true
+    mode: "0644"
+
+- name: Remove sshd config backup
+  when: phase01_sshd_backup.stat.exists
+  file:
+    path: /var/lib/infra/phase01_sshd_config.bak
+    state: absent
+
+- name: Remove sshd hardening lines if no backup
+  when: not phase01_sshd_backup.stat.exists
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item }}"
+    state: absent
+  loop:
+    - '^PermitRootLogin\\b'
+    - '^PasswordAuthentication\\b'
+    - '^ChallengeResponseAuthentication\\b'
+    - '^KbdInteractiveAuthentication\\b'
+    - '^PubkeyAuthentication\\b'
+    - '^AllowUsers\\b'
+
+- name: Validate sshd config
+  command: sshd -t
+  changed_when: false
+
+- name: Reload ssh service
+  service:
+    name: ssh
+    state: reloaded
+
+- name: Remove phase01 state file
+  file:
+    path: /var/lib/infra/phase01.json
+    state: absent

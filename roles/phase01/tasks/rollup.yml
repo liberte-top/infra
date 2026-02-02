@@ -1,4 +1,108 @@
 ---
-- name: phase01 rollup placeholder
-  debug:
-    msg: "phase01 rollup: TODO"
+- name: Ensure infra state dir
+  file:
+    path: /var/lib/infra
+    state: directory
+    mode: "0755"
+
+- name: Ensure admin user
+  user:
+    name: "{{ k3s_admin_user }}"
+    groups: sudo
+    append: true
+    create_home: true
+    shell: /bin/bash
+
+- name: Ensure root ssh directory
+  file:
+    path: /root/.ssh
+    state: directory
+    mode: "0700"
+
+- name: Ensure admin ssh directory
+  file:
+    path: "/home/{{ k3s_admin_user }}/.ssh"
+    state: directory
+    mode: "0700"
+    owner: "{{ k3s_admin_user }}"
+    group: "{{ k3s_admin_user }}"
+
+- name: Install root authorized key
+  authorized_key:
+    user: root
+    key: "{{ root_pubkey }}"
+    state: present
+
+- name: Install admin authorized key
+  authorized_key:
+    user: "{{ k3s_admin_user }}"
+    key: "{{ k3s_admin_pubkey }}"
+    state: present
+
+- name: Configure admin sudoers
+  copy:
+    dest: "/etc/sudoers.d/90-{{ k3s_admin_user }}"
+    content: "{{ k3s_admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+
+- name: Check sshd config backup
+  stat:
+    path: /var/lib/infra/phase01_sshd_config.bak
+  register: phase01_sshd_backup
+
+- name: Backup sshd config once
+  when: not phase01_sshd_backup.stat.exists
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: /var/lib/infra/phase01_sshd_config.bak
+    remote_src: true
+    mode: "0644"
+
+- name: Harden sshd settings
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^PermitRootLogin\\b', line: 'PermitRootLogin prohibit-password' }
+    - { regexp: '^PasswordAuthentication\\b', line: 'PasswordAuthentication no' }
+    - { regexp: '^ChallengeResponseAuthentication\\b', line: 'ChallengeResponseAuthentication no' }
+    - { regexp: '^KbdInteractiveAuthentication\\b', line: 'KbdInteractiveAuthentication no' }
+    - { regexp: '^PubkeyAuthentication\\b', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^AllowUsers\\b', line: "AllowUsers {{ ssh_allow_users | join(' ') }}" }
+
+- name: Validate sshd config
+  command: sshd -t
+  changed_when: false
+
+- name: Reload ssh service
+  service:
+    name: ssh
+    state: reloaded
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase01_now
+  changed_when: false
+
+- name: Build phase01 state
+  set_fact:
+    phase01_state:
+      phase: "01"
+      ok: true
+      timestamp: "{{ phase01_now.stdout }}"
+      users:
+        root_pubkey: "{{ root_pubkey }}"
+        admin_user: "{{ k3s_admin_user }}"
+        admin_pubkey: "{{ k3s_admin_pubkey }}"
+      ssh:
+        allow_users: "{{ ssh_allow_users }}"
+
+- name: Write phase01 state file
+  copy:
+    dest: /var/lib/infra/phase01.json
+    content: "{{ phase01_state | to_nice_json }}"
+    mode: "0644"

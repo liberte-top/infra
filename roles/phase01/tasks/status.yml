@@ -1,4 +1,91 @@
 ---
-- name: phase01 status placeholder
+- name: Compute precheck readiness
   set_fact:
-    phase_status: "{{ phase_status | default({}) | combine({ phase_id: 'pre-not-ready' }) }}"
+    phase01_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
+
+- name: Read phase01 state file
+  slurp:
+    src: /var/lib/infra/phase01.json
+  register: phase01_state_raw
+  ignore_errors: true
+
+- name: Parse phase01 state
+  when: phase01_state_raw is defined and phase01_state_raw.content is defined
+  set_fact:
+    phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
+
+- name: Check admin user exists
+  command: "getent passwd {{ k3s_admin_user }}"
+  register: phase01_admin_user_check
+  changed_when: false
+  failed_when: false
+
+- name: Slurp root authorized_keys
+  slurp:
+    src: /root/.ssh/authorized_keys
+  register: phase01_root_keys
+  ignore_errors: true
+
+- name: Slurp admin authorized_keys
+  slurp:
+    src: "/home/{{ k3s_admin_user }}/.ssh/authorized_keys"
+  register: phase01_admin_keys
+  ignore_errors: true
+
+- name: Check root key presence
+  set_fact:
+    phase01_root_key_present: >-
+      {{
+        phase01_root_keys is defined and phase01_root_keys.content is defined and
+        (phase01_root_keys.content | b64decode).find(root_pubkey) != -1
+      }}
+
+- name: Check admin key presence
+  set_fact:
+    phase01_admin_key_present: >-
+      {{
+        phase01_admin_keys is defined and phase01_admin_keys.content is defined and
+        (phase01_admin_keys.content | b64decode).find(k3s_admin_pubkey) != -1
+      }}
+
+- name: Check sshd settings
+  command: "grep -E '{{ item }}' /etc/ssh/sshd_config"
+  register: phase01_sshd_checks
+  changed_when: false
+  failed_when: false
+  loop:
+    - "^PermitRootLogin prohibit-password$"
+    - "^PasswordAuthentication no$"
+    - "^ChallengeResponseAuthentication no$"
+    - "^KbdInteractiveAuthentication no$"
+    - "^PubkeyAuthentication yes$"
+    - "^AllowUsers {{ ssh_allow_users | join(' ') | regex_escape }}$"
+
+- name: Compute sshd readiness
+  set_fact:
+    phase01_sshd_ok: "{{ phase01_sshd_checks.results | selectattr('rc', 'eq', 0) | list | length == phase01_sshd_checks.results | length }}"
+
+- name: Compute phase01 status value
+  set_fact:
+    phase01_status_value: >-
+      {{
+        'pre-not-ready' if not phase01_pre_ready
+        else
+        (
+          'cur-success' if (
+            (phase01_admin_user_check.rc == 0) and
+            phase01_root_key_present and
+            phase01_admin_key_present and
+            phase01_sshd_ok
+          )
+          else
+          (
+            'cur-failed' if phase01_state is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
+- name: Set phase01 status
+  set_fact:
+    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase01_status_value }) }}"
