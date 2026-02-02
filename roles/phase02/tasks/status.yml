@@ -1,0 +1,133 @@
+---
+- name: Compute precheck readiness
+  set_fact:
+    phase02_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
+
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase02 state dir
+  file:
+    path: /var/lib/infra/phase/02
+    state: directory
+    mode: "0755"
+
+- name: Read phase02 state file
+  slurp:
+    src: /var/lib/infra/phase/02/state.json
+  register: phase02_state_raw
+  ignore_errors: true
+
+- name: Parse phase02 state
+  when: phase02_state_raw is defined and phase02_state_raw.content is defined
+  set_fact:
+    phase02_state: "{{ phase02_state_raw.content | b64decode | from_json }}"
+
+- name: Capture UFW status
+  command: ufw status verbose
+  register: phase02_ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Check UFW defaults
+  set_fact:
+    phase02_ufw_active: "{{ 'Status: active' in phase02_ufw_status.stdout }}"
+    phase02_ufw_defaults_ok: "{{ 'Default: deny (incoming), allow (outgoing), deny (routed)' in phase02_ufw_status.stdout }}"
+
+- name: Check UFW logging
+  set_fact:
+    phase02_ufw_logging_ok: "{{ ('Logging: on (' ~ ufw_logging ~ ')') in phase02_ufw_status.stdout }}"
+
+- name: Slurp UFW default config
+  slurp:
+    src: /etc/default/ufw
+  register: phase02_ufw_default
+  ignore_errors: true
+
+- name: Check UFW IPv6 setting
+  set_fact:
+    phase02_ufw_ipv6_ok: >-
+      {{
+        phase02_ufw_default is defined and
+        phase02_ufw_default.content is defined and
+        (phase02_ufw_default.content | b64decode).find('IPV6=' ~ ('yes' if ufw_ipv6_enabled else 'no')) != -1
+      }}
+
+- name: Initialize UFW port checks
+  set_fact:
+    phase02_ufw_ports_ok: true
+
+- name: Check UFW allow ports
+  set_fact:
+    phase02_ufw_ports_ok: "{{ phase02_ufw_ports_ok and ((item | string) ~ '/tcp') in phase02_ufw_status.stdout }}"
+  loop: "{{ ufw_allow_ports }}"
+
+- name: Check UFW limit ports
+  set_fact:
+    phase02_ufw_limit_ok: >-
+      {{
+        (ufw_limit_ports | default([]) | length == 0) or
+        (
+          (ufw_limit_ports | map('string') | list | length > 0) and
+          ('LIMIT' in phase02_ufw_status.stdout)
+        )
+      }}
+
+- name: Read sysctl values
+  command: "sysctl -n {{ item.key }}"
+  register: phase02_sysctl_reads
+  changed_when: false
+  failed_when: false
+  loop: "{{ liberte_sysctl | dict2items }}"
+
+- name: Compute sysctl readiness
+  set_fact:
+    phase02_sysctl_expected: "{{ phase02_sysctl_reads.results | map(attribute='item') | map(attribute='value') | map('string') | list }}"
+    phase02_sysctl_actual: "{{ phase02_sysctl_reads.results | map(attribute='stdout') | list }}"
+    phase02_sysctl_ok: >-
+      {{
+        (phase02_sysctl_reads.results | selectattr('rc','eq',0) | list | length) == (liberte_sysctl | length)
+        and (phase02_sysctl_actual == phase02_sysctl_expected)
+      }}
+
+- name: Compute phase02 status value
+  set_fact:
+    phase02_status_value: >-
+      {{
+        'pre-not-ready' if not phase02_pre_ready
+        else
+        (
+          'cur-success' if (
+            phase02_ufw_active and
+            phase02_ufw_defaults_ok and
+            phase02_ufw_logging_ok and
+            phase02_ufw_ipv6_ok and
+            phase02_ufw_ports_ok and
+            phase02_ufw_limit_ok and
+            phase02_sysctl_ok
+          )
+          else
+          (
+            'cur-failed' if phase02_state is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
+- name: Set phase02 status
+  set_fact:
+    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase02_status_value }) }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase02_status_now
+  changed_when: false
+
+- name: Write phase02 status file
+  copy:
+    dest: /var/lib/infra/phase/02/status.json
+    content: "{{ {'phase': '02', 'status': phase02_status_value, 'timestamp': phase02_status_now.stdout} | to_nice_json }}"
+    mode: "0644"

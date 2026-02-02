@@ -1,0 +1,41 @@
+---
+- name: Reset UFW rules
+  command: ufw --force reset
+  register: phase02_ufw_reset
+  changed_when: true
+
+- name: Disable UFW
+  ufw:
+    state: disabled
+
+- name: Restore UFW IPv6 default
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^IPV6='
+    line: 'IPV6=yes'
+    create: false
+
+- name: Remove sysctl hardening config
+  file:
+    path: /etc/sysctl.d/99-liberte.conf
+    state: absent
+
+- name: Apply sysctl settings
+  command: sysctl --system
+  register: phase02_sysctl_apply
+  changed_when: false
+
+- name: Remove phase02 state file
+  file:
+    path: /var/lib/infra/phase/02/state.json
+    state: absent
+
+- name: Remove phase02 status file
+  file:
+    path: /var/lib/infra/phase/02/status.json
+    state: absent
+
+- name: Remove phase02 state dir (if empty)
+  file:
+    path: /var/lib/infra/phase/02
+    state: absent

@@ -1,0 +1,4 @@
+# Managed by infra phase02
+{% for item in liberte_sysctl | dict2items | sort(attribute='key') %}
+{{ item.key }} = {{ item.value }}
+{% endfor %}

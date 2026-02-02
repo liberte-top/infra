@@ -1,0 +1,5 @@
+---
+- name: Phase 02
+  include_role:
+    name: phase02
+    tasks_from: "{{ phase_mode }}"
