@@ -71,7 +71,10 @@
     phase01_sshd_ok: >-
       {{
         phase01_sshd_effective.stdout is defined and
-        ('permitrootlogin prohibit-password' in phase01_sshd_effective.stdout) and
+        (
+          ('permitrootlogin prohibit-password' in phase01_sshd_effective.stdout) or
+          ('permitrootlogin without-password' in phase01_sshd_effective.stdout)
+        ) and
         ('passwordauthentication no' in phase01_sshd_effective.stdout) and
         ('challengeresponseauthentication no' in phase01_sshd_effective.stdout) and
         ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and

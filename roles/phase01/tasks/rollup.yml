@@ -91,7 +91,7 @@
   copy:
     dest: /etc/ssh/sshd_config.d/99-liberte.conf
     content: |-
-      PermitRootLogin prohibit-password
+      PermitRootLogin without-password
       PasswordAuthentication no
       ChallengeResponseAuthentication no
       KbdInteractiveAuthentication no
