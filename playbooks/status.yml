@@ -13,6 +13,14 @@
       setup:
         gather_subset:
           - min
+    - name: Debug inventory and var loading (status)
+      debug:
+        msg:
+          inventory_file: "{{ inventory_file | default('') }}"
+          group_names: "{{ group_names }}"
+          k3s_admin_user: "{{ k3s_admin_user | default('UNDEFINED') }}"
+          root_pubkey: "{{ root_pubkey | default('UNDEFINED') }}"
+          ssh_allow_users: "{{ ssh_allow_users | default('UNDEFINED') }}"
     - name: Validate phase_target
       assert:
         that:
