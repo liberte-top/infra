@@ -62,7 +62,7 @@
 
 - name: Check UFW allow ports
   set_fact:
-    phase02_ufw_ports_ok: "{{ phase02_ufw_ports_ok and ((item | string) ~ '/tcp') in phase02_ufw_status.stdout }}"
+    phase02_ufw_ports_ok: "{{ phase02_ufw_ports_ok and ((ufw_port | string) ~ '/tcp') in phase02_ufw_status.stdout }}"
   loop: "{{ ufw_allow_ports }}"
   loop_control:
     loop_var: ufw_port
@@ -89,7 +89,7 @@
 
 - name: Compute sysctl expected/actual
   set_fact:
-    phase02_sysctl_expected: "{{ phase02_sysctl_reads.results | map(attribute='item') | map(attribute='value') | map('string') | list }}"
+    phase02_sysctl_expected: "{{ phase02_sysctl_reads.results | map(attribute='sysctl_item') | map(attribute='value') | map('string') | list }}"
     phase02_sysctl_actual: "{{ phase02_sysctl_reads.results | map(attribute='stdout') | list }}"
 
 - name: Compute sysctl readiness
