@@ -83,7 +83,7 @@
         (phase01_state.users.admin_pubkey | default('')) == k3s_admin_pubkey and
         (phase01_state.ssh.allow_users | default([])) == ssh_allow_users
       }}
-    phase01_skip: >-
+    phase01_ready: >-
       {{
         phase01_state_matches and
         (phase01_admin_user_check.rc == 0) and
@@ -91,6 +91,11 @@
         phase01_admin_key_present and
         phase01_sshd_ok
       }}
+
+- name: Compute phase01 skip flag
+  when: phase01_state is defined
+  set_fact:
+    phase01_skip: "{{ phase01_ready }}"
 
 - name: Skip phase01 rollup when already ready
   meta: end_role

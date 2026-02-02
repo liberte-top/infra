@@ -117,13 +117,18 @@
         (phase02_state.ufw.ipv6_enabled | default(false)) == ufw_ipv6_enabled and
         (phase02_state.sysctl | default({})) == liberte_sysctl
       }}
-    phase02_skip: >-
+    phase02_ready: >-
       {{
         phase02_state_matches and
         phase02_ufw_defaults_ok and
         phase02_ufw_rules_ok and
         phase02_sysctl_ok
       }}
+
+- name: Compute phase02 skip flag
+  when: phase02_state is defined
+  set_fact:
+    phase02_skip: "{{ phase02_ready }}"
 
 - name: Skip phase02 rollup when already ready
   meta: end_role

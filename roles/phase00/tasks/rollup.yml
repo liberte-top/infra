@@ -57,6 +57,10 @@
         (phase00_state.phase | default('')) == '00' and
         (phase00_state.packages.desired | default([])) == phase00_desired_packages
       }}
+
+- name: Compute phase00 skip flag
+  when: phase00_state is defined
+  set_fact:
     phase00_skip: "{{ phase00_packages_ok and phase00_state_matches }}"
 
 - name: Skip phase00 rollup when already ready

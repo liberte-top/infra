@@ -61,7 +61,12 @@
         (phase03_k3s_version_check.stdout | default('')) is search(k3s_version_lock) and
         (phase03_k3s_nodes_check.rc | default(1)) == 0
       }}
-    phase03_skip: "{{ phase03_state_matches and phase03_k3s_ok }}"
+    phase03_ready: "{{ phase03_state_matches and phase03_k3s_ok }}"
+
+- name: Compute phase03 skip flag
+  when: phase03_state is defined
+  set_fact:
+    phase03_skip: "{{ phase03_ready }}"
 
 - name: Skip phase03 rollup when already ready
   meta: end_role
