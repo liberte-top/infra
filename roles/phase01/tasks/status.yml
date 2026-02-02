@@ -3,9 +3,21 @@
   set_fact:
     phase01_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase01 state dir
+  file:
+    path: /var/lib/infra/phase/01
+    state: directory
+    mode: "0755"
+
 - name: Read phase01 state file
   slurp:
-    src: /var/lib/infra/phase01.json
+    src: /var/lib/infra/phase/01/state.json
   register: phase01_state_raw
   ignore_errors: true
 
@@ -37,7 +49,7 @@
     phase01_root_key_present: >-
       {{
         phase01_root_keys is defined and phase01_root_keys.content is defined and
-        (phase01_root_keys.content | b64decode).find(root_pubkey) != -1
+        ((phase01_root_keys.content | b64decode) | trim | length > 0)
       }}
 
 - name: Check admin key presence
@@ -92,3 +104,14 @@
 - name: Set phase01 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase01_status_value }) }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase01_status_now
+  changed_when: false
+
+- name: Write phase01 status file
+  copy:
+    dest: /var/lib/infra/phase/01/status.json
+    content: "{{ {'phase': '01', 'status': phase01_status_value, 'timestamp': phase01_status_now.stdout} | to_nice_json }}"
+    mode: "0644"
