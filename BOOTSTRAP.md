@@ -30,6 +30,14 @@ chmod 600 /root/.ssh/authorized_keys
 ```sh
 # Write a managed block into sshd_config (remove old block if present)
 sed -i '/^# BEGIN LIBERTE BOOTSTRAP$/,/^# END LIBERTE BOOTSTRAP$/d' /etc/ssh/sshd_config
+# Normalize existing directives (first occurrence wins)
+sed -i 's/^PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^KbdInteractiveAuthentication .*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^ChallengeResponseAuthentication .*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+if ! grep -q '^AllowUsers ' /etc/ssh/sshd_config; then
+  echo 'AllowUsers root' >> /etc/ssh/sshd_config
+fi
 cat <<'EOF' >> /etc/ssh/sshd_config
 # BEGIN LIBERTE BOOTSTRAP
 PubkeyAuthentication yes
