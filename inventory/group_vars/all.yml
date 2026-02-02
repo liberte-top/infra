@@ -11,7 +11,7 @@ ssh_allow_users:
   - "root"
   - "k8s-admin"
 
-k3s_version_lock: "stable"
+k3s_version_lock: "v1.34.3+k3s1"
 k3s_etcd_snapshot_retention: 1
 
 ufw_allow_ports:
