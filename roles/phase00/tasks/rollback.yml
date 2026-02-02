@@ -1,7 +1,7 @@
 ---
 - name: Read phase00 state file
   slurp:
-    src: /var/lib/infra/phase00.json
+    src: /var/lib/infra/phase/00/state.json
   register: phase00_state_raw
   ignore_errors: true
 
@@ -25,5 +25,15 @@
 
 - name: Remove phase00 state file
   file:
-    path: /var/lib/infra/phase00.json
+    path: /var/lib/infra/phase/00/state.json
+    state: absent
+
+- name: Remove phase00 status file
+  file:
+    path: /var/lib/infra/phase/00/status.json
+    state: absent
+
+- name: Remove phase00 state dir (if empty)
+  file:
+    path: /var/lib/infra/phase/00
     state: absent

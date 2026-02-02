@@ -1,7 +1,13 @@
 ---
-- name: Ensure infra state dir
+- name: Ensure infra phase base dir
   file:
-    path: /var/lib/infra
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase00 state dir
+  file:
+    path: /var/lib/infra/phase/00
     state: directory
     mode: "0755"
 
@@ -55,6 +61,6 @@
 
 - name: Write phase00 state file
   copy:
-    dest: /var/lib/infra/phase00.json
+    dest: /var/lib/infra/phase/00/state.json
     content: "{{ phase00_state | to_nice_json }}"
     mode: "0644"

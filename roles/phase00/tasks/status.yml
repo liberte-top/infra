@@ -3,9 +3,21 @@
   set_fact:
     phase00_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase00 state dir
+  file:
+    path: /var/lib/infra/phase/00
+    state: directory
+    mode: "0755"
+
 - name: Read phase00 state file
   slurp:
-    src: /var/lib/infra/phase00.json
+    src: /var/lib/infra/phase/00/state.json
   register: phase00_state_raw
   ignore_errors: true
 
@@ -48,3 +60,14 @@
 - name: Set phase00 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase00_status_value }) }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase00_status_now
+  changed_when: false
+
+- name: Write phase00 status file
+  copy:
+    dest: /var/lib/infra/phase/00/status.json
+    content: "{{ {'phase': '00', 'status': phase00_status_value, 'timestamp': phase00_status_now.stdout} | to_nice_json }}"
+    mode: "0644"
