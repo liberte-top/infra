@@ -6,7 +6,7 @@ Scope: one-time manual steps on a fresh server, before any phase rollup.
 ## Inputs (prepare locally)
 - infra host: <IP or hostname>
 - admin login method for initial access: password or console
-- root SSH public key for CI: <ROOT_PUBKEY>
+- **Root SSH public key (must be provided manually by the user)**: <ROOT_PUBKEY>
 
 ## Target State (minimum)
 - root SSH public key installed.
@@ -37,12 +37,13 @@ AllowUsers root
 EOF
 ```
 
-3) Password login policy (choose one)
-- Keep password login (less secure):
+3) Password login policy (bootstrap strategy)
+- **Start with password login enabled**, verify key login works, then disable password login.
+- Keep password login (initial bootstrap):
 ```sh
 echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config.d/99-bootstrap.conf
 ```
-- Disable password login (recommended after key login works):
+- Disable password login (after key login works):
 ```sh
 echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/99-bootstrap.conf
 ```
@@ -51,6 +52,15 @@ echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/99-bootstrap.conf
 ```sh
 sshd -t
 systemctl reload ssh
+```
+
+5) Upload private key to repo secrets (for CI)
+```sh
+# run locally (requires gh auth)
+cd /path/to/infra
+gh secret set INFRA_SSH_HOST --body "<host>"
+gh secret set INFRA_SSH_USER --body "<user>"
+gh secret set INFRA_SSH_PRIVATE_KEY --body "$(cat ~/.ssh/keys/zhaoxi)"
 ```
 
 ## Verification
@@ -63,3 +73,23 @@ ssh root@<host> 'sudo -n true'
 ## Notes
 - This Phase -1 is required if password login is disabled; otherwise CI cannot connect.
 - After CI is working, prefer disabling password login and relying on keys.
+
+## Common Issues (FAQ)
+1) Host key changed after rebuild
+```sh
+ssh-keygen -R <host>
+```
+
+2) `Permission denied (publickey)`
+- Confirm the public key is in `/root/.ssh/authorized_keys`.
+- Check permissions: `/root/.ssh` = 700, `/root/.ssh/authorized_keys` = 600.
+- Ensure `PubkeyAuthentication yes` and `AllowUsers root` are set.
+
+3) `Connection closed by <host> port 22`
+- Validate config: `sshd -t`
+- Check service: `systemctl status ssh`
+- Verify no syntax errors in `/etc/ssh/sshd_config.d/99-bootstrap.conf`.
+
+4) `sudo` prompts for password in CI
+- Use root for the initial bootstrap.
+- For non-root, ensure the user has passwordless sudo.

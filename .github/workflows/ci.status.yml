@@ -14,12 +14,19 @@ jobs:
     container:
       image: willhallonline/ansible:2.18-alpine-3.22
     env:
-      INFRA_HOST: ${{ secrets.INFRA_HOST }}
-      INFRA_USER: ${{ secrets.INFRA_USER }}
-      INFRA_PASSWORD: ${{ secrets.INFRA_PASSWORD }}
+      INFRA_SSH_HOST: ${{ secrets.INFRA_SSH_HOST }}
+      INFRA_SSH_USER: ${{ secrets.INFRA_SSH_USER }}
+      INFRA_SSH_PRIVATE_KEY: ${{ secrets.INFRA_SSH_PRIVATE_KEY }}
+      ANSIBLE_HOST_KEY_CHECKING: "False"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          umask 077
+          printf '%s\n' "$INFRA_SSH_PRIVATE_KEY" > /tmp/infra_ssh_key
+          echo "ANSIBLE_PRIVATE_KEY_FILE=/tmp/infra_ssh_key" >> "$GITHUB_ENV"
 
       - name: Status
         run: |
