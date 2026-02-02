@@ -91,11 +91,14 @@
       }}
 
 - name: Install k3s server
-  shell: >-
-    curl -sfL https://get.k3s.io |
-    INSTALL_K3S_VERSION="{{ phase03_k3s_version_resolved }}"
-    INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}"
-    sh -
+  shell: |
+    set -o pipefail
+    timeout 900s sh -c 'curl -sfL https://get.k3s.io | \
+      INSTALL_K3S_VERSION="{{ phase03_k3s_version_resolved }}" \
+      INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}" \
+      sh -'
+  args:
+    executable: /bin/bash
   args:
     creates: /usr/local/bin/k3s
   when: phase03_k3s_version_resolved is defined and (phase03_k3s_installed_version | default('')) != phase03_k3s_version_resolved

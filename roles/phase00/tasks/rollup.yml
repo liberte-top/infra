@@ -19,6 +19,16 @@
   set_fact:
     phase00_pre_installed: "{{ ansible_facts.packages.keys() | list }}"
 
+- name: Update apt cache (bounded)
+  command: >-
+    timeout 600s apt-get
+    -o Acquire::Retries=3
+    -o Acquire::http::Timeout=30
+    -o Acquire::https::Timeout=30
+    update
+  register: phase00_apt_update
+  changed_when: false
+
 - name: Install baseline packages
   apt:
     name:
@@ -32,8 +42,6 @@
       - logrotate
       - python3
     state: present
-    update_cache: true
-    cache_valid_time: 3600
 
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
