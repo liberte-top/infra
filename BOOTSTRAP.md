@@ -10,6 +10,7 @@ Scope: one-time manual steps on a fresh server, before any phase rollup.
 
 ## Target State (minimum)
 - root SSH public key installed.
+- SSHD baseline is written **directly in `/etc/ssh/sshd_config`** (Phase01 is the source of truth for SSH config).
 - SSHD allows key auth; password auth policy decided.
 - AllowUsers includes root (and optionally other admins).
 
@@ -27,13 +28,16 @@ chmod 600 /root/.ssh/authorized_keys
 
 2) SSHD hardening baseline (key auth on)
 ```sh
-# Prefer to use a drop-in file
-mkdir -p /etc/ssh/sshd_config.d
-cat <<'EOF' > /etc/ssh/sshd_config.d/99-bootstrap.conf
+# Write a managed block into sshd_config (remove old block if present)
+sed -i '/^# BEGIN LIBERTE BOOTSTRAP$/,/^# END LIBERTE BOOTSTRAP$/d' /etc/ssh/sshd_config
+cat <<'EOF' >> /etc/ssh/sshd_config
+# BEGIN LIBERTE BOOTSTRAP
 PubkeyAuthentication yes
 KbdInteractiveAuthentication no
 ChallengeResponseAuthentication no
 AllowUsers root
+PasswordAuthentication yes
+# END LIBERTE BOOTSTRAP
 EOF
 ```
 
@@ -41,11 +45,11 @@ EOF
 - **Start with password login enabled**, verify key login works, then disable password login.
 - Keep password login (initial bootstrap):
 ```sh
-echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config.d/99-bootstrap.conf
+sed -i '/^# BEGIN LIBERTE BOOTSTRAP$/,/^# END LIBERTE BOOTSTRAP$/s/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 ```
 - Disable password login (after key login works):
 ```sh
-echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/99-bootstrap.conf
+sed -i '/^# BEGIN LIBERTE BOOTSTRAP$/,/^# END LIBERTE BOOTSTRAP$/s/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 ```
 
 4) Validate and reload SSHD
@@ -92,7 +96,7 @@ ssh-keygen -R <host>
 3) `Connection closed by <host> port 22`
 - Validate config: `sshd -t`
 - Check service: `systemctl status ssh`
-- Verify no syntax errors in `/etc/ssh/sshd_config.d/99-bootstrap.conf`.
+- Verify no syntax errors in `/etc/ssh/sshd_config` and the **LIBERTE BOOTSTRAP** block.
 
 4) `sudo` prompts for password in CI
 - Use root for the initial bootstrap.

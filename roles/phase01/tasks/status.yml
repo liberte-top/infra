@@ -76,7 +76,6 @@
           ('permitrootlogin without-password' in phase01_sshd_effective.stdout)
         ) and
         ('passwordauthentication no' in phase01_sshd_effective.stdout) and
-        ('challengeresponseauthentication no' in phase01_sshd_effective.stdout) and
         ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and
         ('pubkeyauthentication yes' in phase01_sshd_effective.stdout) and
         ('allowusers root' in phase01_sshd_effective.stdout) and

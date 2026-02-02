@@ -53,39 +53,16 @@
     state: directory
     mode: "0755"
 
-- name: Check bootstrap sshd config (99-bootstrap)
-  stat:
-    path: /etc/ssh/sshd_config.d/99-bootstrap.conf
-  register: phase01_bootstrap_99
-
-- name: Require bootstrap sshd config (99-bootstrap)
-  assert:
-    that:
-      - phase01_bootstrap_99.stat.exists
-    fail_msg: "Missing required /etc/ssh/sshd_config.d/99-bootstrap.conf"
-
-- name: Select bootstrap config path
-  set_fact:
-    phase01_bootstrap_path: /etc/ssh/sshd_config.d/99-bootstrap.conf
-
-- name: Slurp bootstrap sshd config
-  when: phase01_bootstrap_path != ''
-  slurp:
-    src: "{{ phase01_bootstrap_path }}"
-  register: phase01_bootstrap_raw
-
-- name: Backup bootstrap sshd config
-  when: phase01_bootstrap_raw is defined and phase01_bootstrap_raw.content is defined
-  copy:
-    dest: /var/lib/infra/phase/01/bootstrap.conf.bak
-    content: "{{ phase01_bootstrap_raw.content | b64decode }}"
-    mode: "0644"
-
-- name: Remove bootstrap sshd config to avoid overlap
-  when: phase01_bootstrap_path != ''
-  file:
-    path: "{{ phase01_bootstrap_path }}"
-    state: absent
+- name: Ensure sshd base config (bootstrap baseline)
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} LIBERTE BOOTSTRAP"
+    block: |-
+      PubkeyAuthentication yes
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      AllowUsers root
+      PasswordAuthentication yes
 
 - name: Install sshd hardening drop-in
   copy:
@@ -126,9 +103,6 @@
         admin_pubkey: "{{ k3s_admin_pubkey }}"
       ssh:
         allow_users: "{{ ssh_allow_users }}"
-      bootstrap:
-        original_path: "{{ phase01_bootstrap_path }}"
-        backed_up: "{{ phase01_bootstrap_path != '' }}"
 
 - name: Write phase01 state file
   copy:

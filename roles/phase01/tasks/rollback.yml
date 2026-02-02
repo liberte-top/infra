@@ -22,31 +22,11 @@
     path: /etc/ssh/sshd_config.d/99-liberte.conf
     state: absent
 
-- name: Read phase01 state file
-  slurp:
-    src: /var/lib/infra/phase/01/state.json
-  register: phase01_state_raw
-  ignore_errors: true
-
-- name: Parse phase01 state
-  when: phase01_state_raw is defined and phase01_state_raw.content is defined
-  set_fact:
-    phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
-
-- name: Check bootstrap backup presence
-  stat:
-    path: /var/lib/infra/phase/01/bootstrap.conf.bak
-  register: phase01_bootstrap_backup
-
-- name: Restore bootstrap sshd config
-  when: phase01_state is defined and phase01_state.bootstrap is defined and phase01_state.bootstrap.original_path is defined and phase01_state.bootstrap.original_path != '' and phase01_bootstrap_backup.stat.exists
-  copy:
-    src: /var/lib/infra/phase/01/bootstrap.conf.bak
-    dest: "{{ phase01_state.bootstrap.original_path }}"
-    remote_src: true
-    owner: root
-    group: root
-    mode: "0644"
+- name: Remove sshd base config (bootstrap baseline)
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} LIBERTE BOOTSTRAP"
+    state: absent
 
 - name: Validate sshd config
   command: sshd -t
@@ -65,11 +45,6 @@
 - name: Remove phase01 status file
   file:
     path: /var/lib/infra/phase/01/status.json
-    state: absent
-
-- name: Remove bootstrap backup file
-  file:
-    path: /var/lib/infra/phase/01/bootstrap.conf.bak
     state: absent
 
 - name: Remove phase01 state dir (if empty)
