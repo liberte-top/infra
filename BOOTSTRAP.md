@@ -68,6 +68,10 @@ gh secret set INFRA_SSH_PRIVATE_KEY --body "$(cat ~/.ssh/keys/zhaoxi)"
 # from local machine
 ssh root@<host> 'whoami'
 ssh root@<host> 'sudo -n true'
+
+## CI Usage
+- `ci.rollup` and `ci.rollback` each run `status` as a final step.
+- Do not run `ci.status` separately (removed to enforce serial execution).
 ```
 
 ## Notes

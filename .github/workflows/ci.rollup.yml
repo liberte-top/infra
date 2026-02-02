@@ -37,3 +37,8 @@ jobs:
           ansible-playbook -i inventory/hosts.ini playbooks/rollup.yml \
             -e phase_from="${{ inputs.phase_from }}" \
             -e phase_to="${{ inputs.phase_to }}"
+
+      - name: Status (post-rollup)
+        run: |
+          ansible-playbook -i inventory/hosts.ini playbooks/status.yml \
+            -e phase_target="${{ inputs.phase_to }}"
