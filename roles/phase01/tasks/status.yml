@@ -48,22 +48,25 @@
         (phase01_admin_keys.content | b64decode).find(k3s_admin_pubkey) != -1
       }}
 
-- name: Check sshd settings
-  command: "grep -E '{{ item }}' /etc/ssh/sshd_config"
-  register: phase01_sshd_checks
+- name: Check effective sshd settings
+  command: "sshd -T -C user=root"
+  register: phase01_sshd_effective
   changed_when: false
   failed_when: false
-  loop:
-    - "^PermitRootLogin prohibit-password$"
-    - "^PasswordAuthentication no$"
-    - "^ChallengeResponseAuthentication no$"
-    - "^KbdInteractiveAuthentication no$"
-    - "^PubkeyAuthentication yes$"
-    - "^AllowUsers {{ ssh_allow_users | join(' ') | regex_escape }}$"
 
 - name: Compute sshd readiness
   set_fact:
-    phase01_sshd_ok: "{{ phase01_sshd_checks.results | selectattr('rc', 'eq', 0) | list | length == phase01_sshd_checks.results | length }}"
+    phase01_sshd_ok: >-
+      {{
+        phase01_sshd_effective.stdout is defined and
+        ('permitrootlogin prohibit-password' in phase01_sshd_effective.stdout) and
+        ('passwordauthentication no' in phase01_sshd_effective.stdout) and
+        ('challengeresponseauthentication no' in phase01_sshd_effective.stdout) and
+        ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and
+        ('pubkeyauthentication yes' in phase01_sshd_effective.stdout) and
+        ('allowusers root' in phase01_sshd_effective.stdout) and
+        ('allowusers ' ~ k3s_admin_user in phase01_sshd_effective.stdout)
+      }}
 
 - name: Compute phase01 status value
   set_fact:

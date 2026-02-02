@@ -47,32 +47,25 @@
     group: root
     mode: "0440"
 
-- name: Check sshd config backup
-  stat:
-    path: /var/lib/infra/phase01_sshd_config.bak
-  register: phase01_sshd_backup
+- name: Ensure sshd config drop-in dir
+  file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    mode: "0755"
 
-- name: Backup sshd config once
-  when: not phase01_sshd_backup.stat.exists
+- name: Install sshd hardening drop-in
   copy:
-    src: /etc/ssh/sshd_config
-    dest: /var/lib/infra/phase01_sshd_config.bak
-    remote_src: true
+    dest: /etc/ssh/sshd_config.d/99-liberte.conf
+    content: |-
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      AllowUsers {{ ssh_allow_users | join(' ') }}
+    owner: root
+    group: root
     mode: "0644"
-
-- name: Harden sshd settings
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-    state: present
-  loop:
-    - { regexp: '^PermitRootLogin\\b', line: 'PermitRootLogin prohibit-password' }
-    - { regexp: '^PasswordAuthentication\\b', line: 'PasswordAuthentication no' }
-    - { regexp: '^ChallengeResponseAuthentication\\b', line: 'ChallengeResponseAuthentication no' }
-    - { regexp: '^KbdInteractiveAuthentication\\b', line: 'KbdInteractiveAuthentication no' }
-    - { regexp: '^PubkeyAuthentication\\b', line: 'PubkeyAuthentication yes' }
-    - { regexp: '^AllowUsers\\b', line: "AllowUsers {{ ssh_allow_users | join(' ') }}" }
 
 - name: Validate sshd config
   command: sshd -t
