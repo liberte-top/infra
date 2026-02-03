@@ -21,10 +21,21 @@
   register: phase01_state_raw
   ignore_errors: true
 
+- name: Read phase01 status file
+  slurp:
+    src: /var/lib/infra/phase/01/status.json
+  register: phase01_status_raw
+  ignore_errors: true
+
 - name: Parse phase01 state
   when: phase01_state_raw is defined and phase01_state_raw.content is defined
   set_fact:
     phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
+
+- name: Parse phase01 status
+  when: phase01_status_raw is defined and phase01_status_raw.content is defined
+  set_fact:
+    phase01_status_prev: "{{ phase01_status_raw.content | b64decode | from_json }}"
 
 - name: Check admin user exists
   command: "getent passwd {{ k3s_admin_user }}"
@@ -107,6 +118,14 @@
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase01_status_value }) }}"
 
+- name: Check phase01 status change
+  set_fact:
+    phase01_status_changed: >-
+      {{
+        (phase01_status_prev is not defined) or
+        (phase01_status_prev.status | default('') != phase01_status_value)
+      }}
+
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
   register: phase01_status_now
@@ -117,3 +136,4 @@
     dest: /var/lib/infra/phase/01/status.json
     content: "{{ {'phase': '01', 'status': phase01_status_value, 'timestamp': phase01_status_now.stdout} | to_nice_json }}"
     mode: "0644"
+  when: phase01_status_changed | default(true)

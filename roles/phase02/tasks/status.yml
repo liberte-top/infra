@@ -21,10 +21,21 @@
   register: phase02_state_raw
   ignore_errors: true
 
+- name: Read phase02 status file
+  slurp:
+    src: /var/lib/infra/phase/02/status.json
+  register: phase02_status_raw
+  ignore_errors: true
+
 - name: Parse phase02 state
   when: phase02_state_raw is defined and phase02_state_raw.content is defined
   set_fact:
     phase02_state: "{{ phase02_state_raw.content | b64decode | from_json }}"
+
+- name: Parse phase02 status
+  when: phase02_status_raw is defined and phase02_status_raw.content is defined
+  set_fact:
+    phase02_status_prev: "{{ phase02_status_raw.content | b64decode | from_json }}"
 
 - name: Capture UFW status
   command: ufw status verbose
@@ -138,6 +149,14 @@
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase02_status_value }) }}"
 
+- name: Check phase02 status change
+  set_fact:
+    phase02_status_changed: >-
+      {{
+        (phase02_status_prev is not defined) or
+        (phase02_status_prev.status | default('') != phase02_status_value)
+      }}
+
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
   register: phase02_status_now
@@ -148,3 +167,4 @@
     dest: /var/lib/infra/phase/02/status.json
     content: "{{ {'phase': '02', 'status': phase02_status_value, 'timestamp': phase02_status_now.stdout} | to_nice_json }}"
     mode: "0644"
+  when: phase02_status_changed | default(true)

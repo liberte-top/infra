@@ -21,10 +21,21 @@
   register: phase00_state_raw
   ignore_errors: true
 
+- name: Read phase00 status file
+  slurp:
+    src: /var/lib/infra/phase/00/status.json
+  register: phase00_status_raw
+  ignore_errors: true
+
 - name: Parse phase00 state
   when: phase00_state_raw is defined and phase00_state_raw.content is defined
   set_fact:
     phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+
+- name: Parse phase00 status
+  when: phase00_status_raw is defined and phase00_status_raw.content is defined
+  set_fact:
+    phase00_status_prev: "{{ phase00_status_raw.content | b64decode | from_json }}"
 
 - name: Check installed packages (dpkg, batch)
   command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_state.packages.desired | join(' ') }}"
@@ -61,6 +72,14 @@
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase00_status_value }) }}"
 
+- name: Check phase00 status change
+  set_fact:
+    phase00_status_changed: >-
+      {{
+        (phase00_status_prev is not defined) or
+        (phase00_status_prev.status | default('') != phase00_status_value)
+      }}
+
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
   register: phase00_status_now
@@ -71,3 +90,4 @@
     dest: /var/lib/infra/phase/00/status.json
     content: "{{ {'phase': '00', 'status': phase00_status_value, 'timestamp': phase00_status_now.stdout} | to_nice_json }}"
     mode: "0644"
+  when: phase00_status_changed | default(true)
