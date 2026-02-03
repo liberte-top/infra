@@ -18,8 +18,7 @@ ufw_allow_ports:
   - 22
   - 80
   - 443
-ufw_limit_ports:
-  - 22
+ufw_limit_ports: []
 ufw_logging: "medium"
 ufw_ipv6_enabled: false
 
