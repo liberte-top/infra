@@ -68,6 +68,26 @@ ensure_clean_worktree() {
   fi
 }
 
+ensure_ref_synced() {
+  if ! git -C "$infra_root" fetch --quiet origin "$ref"; then
+    echo "Failed to fetch origin/$ref" >&2
+    exit 1
+  fi
+
+  local_sha=$(git -C "$infra_root" rev-parse "$ref" 2>/dev/null || true)
+  remote_sha=$(git -C "$infra_root" rev-parse "origin/$ref" 2>/dev/null || true)
+
+  if [ -z "$local_sha" ] || [ -z "$remote_sha" ]; then
+    echo "Unable to resolve ref or origin ref for '$ref'" >&2
+    exit 1
+  fi
+
+  if [ "$local_sha" != "$remote_sha" ]; then
+    echo "Ref mismatch: local $ref=$local_sha != origin/$ref=$remote_sha" >&2
+    exit 1
+  fi
+}
+
 run_workflow() {
   local workflow="$1"
   local start
@@ -97,6 +117,7 @@ run_workflow() {
 }
 
 ensure_clean_worktree
+ensure_ref_synced
 
 case "$cmd" in
   rollup)
