@@ -39,12 +39,16 @@
 - name: Check UFW allow ports
   shell: |
     set -e
+    ufw_rules=$(cat <<'EOF__UFW'
+    {{ phase02_ufw_numbered.stdout | default('') }}
+    EOF__UFW
+    )
     ports="{{ (ufw_allow_ports | difference(ufw_limit_ports | default([]))) | join(' ') }}"
     if [ -z "$ports" ]; then
       exit 0
     fi
     for port in $ports; do
-      ufw status numbered | grep -Eq "\\b${port}/tcp\\b.*ALLOW IN" || exit 1
+      printf '%s\n' "$ufw_rules" | grep -Eq "\\b${port}/tcp\\b.*ALLOW IN" || exit 1
     done
   args:
     executable: /bin/bash
@@ -56,12 +60,16 @@
 - name: Check UFW limit ports
   shell: |
     set -e
+    ufw_rules=$(cat <<'EOF__UFW'
+    {{ phase02_ufw_numbered.stdout | default('') }}
+    EOF__UFW
+    )
     ports="{{ (ufw_limit_ports | default([])) | join(' ') }}"
     if [ -z "$ports" ]; then
       exit 0
     fi
     for port in $ports; do
-      ufw status numbered | grep -Eq "\\b${port}/tcp\\b.*LIMIT IN" || exit 1
+      printf '%s\n' "$ufw_rules" | grep -Eq "\\b${port}/tcp\\b.*LIMIT IN" || exit 1
     done
   args:
     executable: /bin/bash
@@ -70,9 +78,11 @@
   failed_when: false
   when: phase02_state is defined
 
-- name: Check sysctl values
-  command: "sysctl -n {{ item.key }}"
-  loop: "{{ liberte_sysctl | dict2items | sort(attribute='key') }}"
+- name: Check sysctl values (batch)
+  command: >-
+    sysctl -n {{
+      (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='key') | list) | join(' ')
+    }}
   register: phase02_sysctl_checks
   changed_when: false
   failed_when: false
@@ -81,20 +91,15 @@
 - name: Compute phase02 sysctl readiness
   when: phase02_state is defined
   set_fact:
+    phase02_sysctl_expected: >-
+      {{
+        (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
+      }}
+    phase02_sysctl_actual: "{{ phase02_sysctl_checks.stdout_lines | default([]) | map('trim') | list }}"
     phase02_sysctl_ok: >-
       {{
-        phase02_sysctl_checks.results is defined and
-        (phase02_sysctl_checks.results | selectattr('rc', 'equalto', 0) | list | length
-          == (liberte_sysctl | length)) and
-        (
-          phase02_sysctl_checks.results
-          | map(attribute='stdout')
-          | list
-          | map('trim')
-          | list
-          ==
-          (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
-        )
+        (phase02_sysctl_actual | length) == (liberte_sysctl | length) and
+        (phase02_sysctl_actual == phase02_sysctl_expected)
       }}
 
 - name: Compute phase02 ufw readiness

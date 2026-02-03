@@ -78,25 +78,28 @@
         )
       }}
 
-- name: Read sysctl values
-  command: "sysctl -n {{ sysctl_item.key }}"
+- name: Read sysctl values (batch)
+  command: >-
+    sysctl -n {{
+      (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='key') | list) | join(' ')
+    }}
   register: phase02_sysctl_reads
   changed_when: false
   failed_when: false
-  loop: "{{ liberte_sysctl | dict2items }}"
-  loop_control:
-    loop_var: sysctl_item
 
 - name: Compute sysctl expected/actual
   set_fact:
-    phase02_sysctl_expected: "{{ phase02_sysctl_reads.results | map(attribute='sysctl_item') | map(attribute='value') | map('string') | list }}"
-    phase02_sysctl_actual: "{{ phase02_sysctl_reads.results | map(attribute='stdout') | list }}"
+    phase02_sysctl_expected: >-
+      {{
+        (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
+      }}
+    phase02_sysctl_actual: "{{ phase02_sysctl_reads.stdout_lines | default([]) | map('trim') | list }}"
 
 - name: Compute sysctl readiness
   set_fact:
     phase02_sysctl_ok: >-
       {{
-        (phase02_sysctl_reads.results | selectattr('rc','eq',0) | list | length) == (liberte_sysctl | length)
+        (phase02_sysctl_actual | length) == (liberte_sysctl | length)
         and (phase02_sysctl_actual == phase02_sysctl_expected)
       }}
 
