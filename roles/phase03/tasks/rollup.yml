@@ -152,7 +152,6 @@
       sh -'
   args:
     executable: /bin/bash
-  args:
     creates: /usr/local/bin/k3s
   when: phase03_k3s_version_resolved is defined and (phase03_k3s_installed_version | default('')) != phase03_k3s_version_resolved
 
