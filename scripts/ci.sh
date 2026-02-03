@@ -6,12 +6,10 @@ usage() {
 Usage:
   scripts/ci.sh rollup   --from <phase> --to <phase> [--ref <branch>]
   scripts/ci.sh rollback --from <phase> --to <phase> [--ref <branch>]
-  scripts/ci.sh apply    [--ref <branch>]
 
 Examples:
   scripts/ci.sh rollup --from 00 --to 02 --ref main
   scripts/ci.sh rollback --from 00 --to 02 --ref main
-  scripts/ci.sh apply --ref main
 USAGE
 }
 
@@ -113,7 +111,7 @@ run_workflow() {
     exit 1
   fi
 
-  (cd "$infra_root" && gh run watch "$run_id" --exit-status)
+  echo "Workflow Run Id: $run_id"
 }
 
 ensure_clean_worktree
@@ -133,9 +131,6 @@ case "$cmd" in
       exit 1
     fi
     run_workflow "ci.rollback" -f phase_from="$phase_from" -f phase_to="$phase_to"
-    ;;
-  apply)
-    run_workflow "ci.apply"
     ;;
   *)
     echo "Unknown command: $cmd" >&2
