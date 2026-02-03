@@ -4,12 +4,16 @@
   register: phase05_uninstall
   changed_when: false
   failed_when: false
+  environment:
+    KUBECONFIG: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Remove cert-manager namespace (optional)
   command: /usr/local/bin/kubectl delete namespace "{{ cert_manager_namespace }}"
   when: cert_manager_purge_namespace | default(false)
   changed_when: false
   failed_when: false
+  environment:
+    KUBECONFIG: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Remove phase05 state file
   file:

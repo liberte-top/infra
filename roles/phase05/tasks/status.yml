@@ -54,6 +54,7 @@
         (helm_version_lock | regex_search('^v'))
         | ternary(helm_version_lock, 'v' ~ helm_version_lock)
       }}
+    phase05_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Check helm binary
   stat:
@@ -66,6 +67,8 @@
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute helm version match
   set_fact:
@@ -81,6 +84,8 @@
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Check cert-manager deployments
   command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=30s
@@ -91,12 +96,16 @@
     - cert-manager
     - cert-manager-cainjector
     - cert-manager-webhook
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Check cert-manager CRD
   command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
   register: phase05_cm_crd
   changed_when: false
   failed_when: false
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute phase05 readiness
   set_fact:

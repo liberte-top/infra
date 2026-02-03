@@ -34,6 +34,7 @@
         (helm_version_lock | regex_search('^v'))
         | ternary(helm_version_lock, 'v' ~ helm_version_lock)
       }}
+    phase05_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Detect system architecture
   command: uname -m
@@ -60,6 +61,8 @@
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute helm version match
   set_fact:
@@ -79,6 +82,8 @@
     - cert-manager-cainjector
     - cert-manager-webhook
   when: phase05_state_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Check cert-manager CRD
   command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
@@ -86,6 +91,8 @@
   changed_when: false
   failed_when: false
   when: phase05_state_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute phase05 readiness
   set_fact:
@@ -174,6 +181,8 @@
     --set crds.enabled=true
     --wait
     --timeout 300s
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Wait for cert-manager deployments
   command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=180s
@@ -183,6 +192,8 @@
     - cert-manager
     - cert-manager-cainjector
     - cert-manager-webhook
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
