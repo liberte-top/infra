@@ -48,6 +48,12 @@
   failed_when: false
   when: phase03_state is defined
 
+- name: Check kubeconfig permissions
+  stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: phase03_kubeconfig_stat
+  when: phase03_state is defined
+
 - name: Compute phase03 state match
   when: phase03_state is defined
   set_fact:
@@ -70,11 +76,19 @@
         (phase03_k3s_version_check.stdout | default('')) is search(k3s_version_lock) and
         (phase03_k3s_nodes_check.rc | default(1)) == 0
       }}
+    phase03_kubeconfig_ok: >-
+      {{
+        phase03_kubeconfig_stat is defined and
+        phase03_kubeconfig_stat.stat is defined and
+        (phase03_kubeconfig_stat.stat.exists | default(false)) and
+        (phase03_kubeconfig_stat.stat.grp | default('')) == k3s_admin_user and
+        (phase03_kubeconfig_stat.stat.mode | default('')) == '0640'
+      }}
 
 - name: Compute phase03 ready flag
   when: phase03_state is defined
   set_fact:
-    phase03_ready: "{{ phase03_state_matches and phase03_k3s_ok }}"
+    phase03_ready: "{{ phase03_state_matches and phase03_k3s_ok and phase03_kubeconfig_ok }}"
 
 - name: Compute phase03 skip flag
   when: phase03_state is defined
@@ -166,6 +180,13 @@
     state: started
     enabled: true
 
+- name: Ensure kubeconfig is readable by admin group
+  file:
+    path: /etc/rancher/k3s/k3s.yaml
+    owner: root
+    group: "{{ k3s_admin_user }}"
+    mode: "0640"
+
 - name: Ensure admin kubeconfig directory
   file:
     path: "/home/{{ k3s_admin_user }}/.kube"
@@ -211,6 +232,9 @@
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
       kubeconfig:
+        system_path: "/etc/rancher/k3s/k3s.yaml"
+        system_group: "{{ k3s_admin_user }}"
+        system_mode: "0640"
         path: "/home/{{ k3s_admin_user }}/.kube/config"
 
 - name: Build phase03 state compare
@@ -226,6 +250,9 @@
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
       kubeconfig:
+        system_path: "/etc/rancher/k3s/k3s.yaml"
+        system_group: "{{ k3s_admin_user }}"
+        system_mode: "0640"
         path: "/home/{{ k3s_admin_user }}/.kube/config"
     phase03_state_prev_compact: >-
       {{
