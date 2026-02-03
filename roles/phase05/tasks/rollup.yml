@@ -1,0 +1,243 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase05 state dir
+  file:
+    path: /var/lib/infra/phase/05
+    state: directory
+    mode: "0755"
+
+- name: Stat phase05 state file
+  stat:
+    path: /var/lib/infra/phase/05/state.json
+  register: phase05_state_stat
+
+- name: Read phase05 state file
+  slurp:
+    src: /var/lib/infra/phase/05/state.json
+  register: phase05_state_raw
+  when: phase05_state_stat.stat.exists
+
+- name: Parse phase05 state
+  when: phase05_state_raw is defined and phase05_state_raw.content is defined
+  set_fact:
+    phase05_state_prev: "{{ phase05_state_raw.content | b64decode | from_json }}"
+
+- name: Normalize helm version
+  set_fact:
+    phase05_helm_version: >-
+      {{
+        (helm_version_lock | regex_search('^v'))
+        | ternary(helm_version_lock, 'v' ~ helm_version_lock)
+      }}
+
+- name: Detect system architecture
+  command: uname -m
+  register: phase05_uname
+  changed_when: false
+
+- name: Map helm architecture
+  set_fact:
+    phase05_helm_arch: >-
+      {{
+        'amd64' if (phase05_uname.stdout | default('')) in ['x86_64', 'amd64'] else
+        'arm64' if (phase05_uname.stdout | default('')) in ['aarch64', 'arm64'] else
+        (phase05_uname.stdout | default('amd64'))
+      }}
+
+- name: Check helm binary
+  stat:
+    path: /usr/local/bin/helm
+  register: phase05_helm_bin
+
+- name: Read helm version
+  command: /usr/local/bin/helm version --short
+  register: phase05_helm_version_raw
+  changed_when: false
+  failed_when: false
+  when: phase05_helm_bin.stat.exists
+
+- name: Compute helm version match
+  set_fact:
+    phase05_helm_version_ok: >-
+      {{
+        phase05_helm_version_raw is defined and
+        (phase05_helm_version_raw.stdout | default('')) is search(phase05_helm_version)
+      }}
+
+- name: Check cert-manager deployments
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=30s
+  register: phase05_cm_rollout
+  changed_when: false
+  failed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+  when: phase05_state_prev is defined
+
+- name: Check cert-manager CRD
+  command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
+  register: phase05_cm_crd
+  changed_when: false
+  failed_when: false
+  when: phase05_state_prev is defined
+
+- name: Compute phase05 readiness
+  set_fact:
+    phase05_ready: >-
+      {{
+        (phase05_helm_version_ok | default(false)) and
+        (phase05_cm_crd is defined and (phase05_cm_crd.rc | default(1)) == 0) and
+        (
+          phase05_cm_rollout is defined and
+          (phase05_cm_rollout.results | map(attribute='rc') | list | max | default(1)) == 0
+        )
+      }}
+  when: phase05_state_prev is defined
+
+- name: Compute phase05 state match
+  set_fact:
+    phase05_state_matches: >-
+      {{
+        (phase05_state_prev.phase | default('')) == '05' and
+        (phase05_state_prev.helm.version | default('')) == phase05_helm_version and
+        (phase05_state_prev.cert_manager.release | default('')) == cert_manager_release and
+        (phase05_state_prev.cert_manager.namespace | default('')) == cert_manager_namespace and
+        (phase05_state_prev.cert_manager.chart | default('')) == cert_manager_chart and
+        (phase05_state_prev.cert_manager.version | default('')) == cert_manager_version_lock and
+        (phase05_state_prev.cert_manager.crds_enabled | default(false)) == true
+      }}
+  when: phase05_state_prev is defined
+
+- name: Skip phase05 rollup when already ready
+  meta: end_role
+  when: (phase05_state_prev is defined) and (phase05_state_matches | default(false)) and (phase05_ready | default(false))
+
+- name: Ensure helm temp dir
+  file:
+    path: /tmp/infra-helm
+    state: directory
+    mode: "0755"
+
+- name: Build helm download URLs
+  set_fact:
+    phase05_helm_tgz_url: "https://get.helm.sh/helm-{{ phase05_helm_version }}-linux-{{ phase05_helm_arch }}.tar.gz"
+    phase05_helm_sha_url: "https://get.helm.sh/helm-{{ phase05_helm_version }}-linux-{{ phase05_helm_arch }}.tar.gz.sha256"
+
+- name: Download helm sha256
+  get_url:
+    url: "{{ phase05_helm_sha_url }}"
+    dest: /tmp/infra-helm/helm.sha256
+    mode: "0644"
+
+- name: Read helm sha256
+  slurp:
+    src: /tmp/infra-helm/helm.sha256
+  register: phase05_helm_sha_raw
+
+- name: Parse helm sha256
+  set_fact:
+    phase05_helm_sha: "{{ phase05_helm_sha_raw.content | b64decode | trim }}"
+
+- name: Download helm tarball
+  get_url:
+    url: "{{ phase05_helm_tgz_url }}"
+    dest: /tmp/infra-helm/helm.tgz
+    checksum: "sha256:{{ phase05_helm_sha }}"
+    mode: "0644"
+
+- name: Extract helm tarball
+  unarchive:
+    src: /tmp/infra-helm/helm.tgz
+    dest: /tmp/infra-helm
+    remote_src: true
+
+- name: Install helm binary
+  copy:
+    src: "/tmp/infra-helm/linux-{{ phase05_helm_arch }}/helm"
+    dest: /usr/local/bin/helm
+    mode: "0755"
+    remote_src: true
+
+- name: Install cert-manager via helm
+  command: >-
+    /usr/local/bin/helm upgrade --install "{{ cert_manager_release }}"
+    "{{ cert_manager_chart }}"
+    --version "{{ cert_manager_version_lock }}"
+    --namespace "{{ cert_manager_namespace }}"
+    --create-namespace
+    --set crds.enabled=true
+    --wait
+    --timeout 300s
+
+- name: Wait for cert-manager deployments
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=180s
+  register: phase05_cm_rollout_apply
+  changed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase05_now
+  changed_when: false
+
+- name: Build phase05 state
+  set_fact:
+    phase05_state:
+      phase: "05"
+      ok: true
+      timestamp: "{{ phase05_now.stdout }}"
+      helm:
+        version: "{{ phase05_helm_version }}"
+        path: /usr/local/bin/helm
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+
+- name: Build phase05 state compare
+  set_fact:
+    phase05_state_compact:
+      phase: "05"
+      ok: true
+      helm:
+        version: "{{ phase05_helm_version }}"
+        path: /usr/local/bin/helm
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+    phase05_state_prev_compact: >-
+      {{
+        (phase05_state_prev | default({}))
+        | dict2items
+        | rejectattr('key', 'equalto', 'timestamp')
+        | items2dict
+      }}
+
+- name: Check phase05 state change
+  set_fact:
+    phase05_state_changed: >-
+      {{
+        (phase05_state_prev is not defined) or
+        (phase05_state_prev_compact != phase05_state_compact)
+      }}
+
+- name: Write phase05 state file
+  copy:
+    dest: /var/lib/infra/phase/05/state.json
+    content: "{{ phase05_state | to_nice_json }}"
+    mode: "0644"
+  when: phase05_state_changed | default(true)

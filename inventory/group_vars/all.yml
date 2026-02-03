@@ -61,3 +61,9 @@ liberte_sysctl:
 log_retention_days: 1
 image_retention_days: 1
 image_retention_count: 3
+
+helm_version_lock: "v4.1.0"
+cert_manager_version_lock: "v1.19.2"
+cert_manager_namespace: "cert-manager"
+cert_manager_release: "cert-manager"
+cert_manager_chart: "oci://quay.io/jetstack/charts/cert-manager"
