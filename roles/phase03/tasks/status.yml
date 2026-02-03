@@ -38,21 +38,21 @@
   changed_when: false
   failed_when: false
 
-- name: Check node readiness
-  command: /usr/local/bin/kubectl get nodes --no-headers --request-timeout=20s
-  register: phase03_k3s_nodes
+- name: Check API readiness
+  command: /usr/local/bin/kubectl get --raw='/readyz' --request-timeout=5s
+  register: phase03_k3s_readyz
   changed_when: false
   failed_when: false
-  retries: 6
-  delay: 10
-  until: phase03_k3s_nodes.rc == 0
+  retries: 3
+  delay: 5
+  until: phase03_k3s_readyz.rc == 0
 
 - name: Compute k3s readiness
   set_fact:
     phase03_k3s_ready: >-
       {{
         (phase03_k3s_service.stdout | default('')) == 'active'
-        and ' Ready ' in (' ' ~ (phase03_k3s_nodes.stdout | default('')) ~ ' ')
+        and (phase03_k3s_readyz.rc | default(1)) == 0
       }}
 
 - name: Compute phase03 status value
