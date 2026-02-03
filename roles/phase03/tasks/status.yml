@@ -21,10 +21,21 @@
   register: phase03_state_raw
   ignore_errors: true
 
+- name: Read phase03 status file
+  slurp:
+    src: /var/lib/infra/phase/03/status.json
+  register: phase03_status_raw
+  ignore_errors: true
+
 - name: Parse phase03 state
   when: phase03_state_raw is defined and phase03_state_raw.content is defined
   set_fact:
     phase03_state: "{{ phase03_state_raw.content | b64decode | from_json }}"
+
+- name: Parse phase03 status
+  when: phase03_status_raw is defined and phase03_status_raw.content is defined
+  set_fact:
+    phase03_status_prev: "{{ phase03_status_raw.content | b64decode | from_json }}"
 
 - name: Capture k3s service status
   command: systemctl is-active k3s
@@ -75,6 +86,14 @@
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase03_status_value }) }}"
 
+- name: Check phase03 status change
+  set_fact:
+    phase03_status_changed: >-
+      {{
+        (phase03_status_prev is not defined) or
+        (phase03_status_prev.status | default('') != phase03_status_value)
+      }}
+
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
   register: phase03_status_now
@@ -85,3 +104,4 @@
     dest: /var/lib/infra/phase/03/status.json
     content: "{{ {'phase': '03', 'status': phase03_status_value, 'timestamp': phase03_status_now.stdout} | to_nice_json }}"
     mode: "0644"
+  when: phase03_status_changed | default(true)
