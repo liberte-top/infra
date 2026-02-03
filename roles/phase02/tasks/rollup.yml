@@ -95,7 +95,7 @@
   failed_when: false
   when: phase02_state is defined
 
-- name: Compute phase02 sysctl readiness
+- name: Compute phase02 sysctl expected/actual
   when: phase02_state is defined
   set_fact:
     phase02_sysctl_expected: >-
@@ -103,6 +103,10 @@
         (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='value') | map('string') | list)
       }}
     phase02_sysctl_actual: "{{ phase02_sysctl_checks.stdout_lines | default([]) | map('trim') | list }}"
+
+- name: Compute phase02 sysctl readiness
+  when: phase02_state is defined
+  set_fact:
     phase02_sysctl_ok: >-
       {{
         (phase02_sysctl_actual | length) == (liberte_sysctl | length) and
