@@ -82,7 +82,7 @@
   shell: |
     set -e
     for key in {{ (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='key') | list) | join(' ') }}; do
-      path="/proc/sys/${key//./\\/}"
+      path="/proc/sys/${key//./\/}"
       if [ ! -r "$path" ]; then
         exit 1
       fi
