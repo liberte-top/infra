@@ -78,11 +78,18 @@
   failed_when: false
   when: phase02_state is defined
 
-- name: Check sysctl values (batch)
-  command: >-
-    sysctl -n {{
-      (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='key') | list) | join(' ')
-    }}
+- name: Read sysctl values (procfs, batch)
+  shell: |
+    set -e
+    for key in {{ (liberte_sysctl | dict2items | sort(attribute='key') | map(attribute='key') | list) | join(' ') }}; do
+      path="/proc/sys/${key//./\\/}"
+      if [ ! -r "$path" ]; then
+        exit 1
+      fi
+      cat "$path"
+    done
+  args:
+    executable: /bin/bash
   register: phase02_sysctl_checks
   changed_when: false
   failed_when: false
