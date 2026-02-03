@@ -1,0 +1,125 @@
+---
+- name: Compute precheck readiness
+  set_fact:
+    phase04_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
+
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase04 state dir
+  file:
+    path: /var/lib/infra/phase/04
+    state: directory
+    mode: "0755"
+
+- name: Stat phase04 state file
+  stat:
+    path: /var/lib/infra/phase/04/state.json
+  register: phase04_state_stat
+
+- name: Read phase04 state file
+  slurp:
+    src: /var/lib/infra/phase/04/state.json
+  register: phase04_state_raw
+  when: phase04_state_stat.stat.exists
+
+- name: Stat phase04 status file
+  stat:
+    path: /var/lib/infra/phase/04/status.json
+  register: phase04_status_stat
+
+- name: Read phase04 status file
+  slurp:
+    src: /var/lib/infra/phase/04/status.json
+  register: phase04_status_raw
+  when: phase04_status_stat.stat.exists
+
+- name: Parse phase04 state
+  when: phase04_state_raw is defined and phase04_state_raw.content is defined
+  set_fact:
+    phase04_state: "{{ phase04_state_raw.content | b64decode | from_json }}"
+
+- name: Parse phase04 status
+  when: phase04_status_raw is defined and phase04_status_raw.content is defined
+  set_fact:
+    phase04_status_prev: "{{ phase04_status_raw.content | b64decode | from_json }}"
+
+- name: Set phase04 defaults
+  set_fact:
+    phase04_image_gc_script_path: "{{ phase04_image_gc_script_path | default('/usr/local/sbin/infra/k8s-image-gc') }}"
+    phase04_logrotate_config_path: "{{ phase04_logrotate_config_path | default('/etc/infra/logrotate.d/infra-maint') }}"
+
+- name: Check k8s image gc script
+  stat:
+    path: "{{ phase04_image_gc_script_path }}"
+  register: phase04_image_gc_script_stat
+
+- name: Check logrotate config
+  stat:
+    path: "{{ phase04_logrotate_config_path }}"
+  register: phase04_logrotate_config_stat
+
+- name: Check infra k8s image gc timer
+  command: systemctl is-active infra-k8s-image-gc.timer
+  register: phase04_image_gc_timer
+  changed_when: false
+  failed_when: false
+
+- name: Check infra logrotate timer
+  command: systemctl is-active infra-logrotate.timer
+  register: phase04_logrotate_timer
+  changed_when: false
+  failed_when: false
+
+- name: Compute phase04 readiness
+  set_fact:
+    phase04_ready: >-
+      {{
+        phase04_image_gc_script_stat.stat.exists and
+        phase04_logrotate_config_stat.stat.exists and
+        (phase04_image_gc_timer.stdout | default('')) == 'active' and
+        (phase04_logrotate_timer.stdout | default('')) == 'active'
+      }}
+
+- name: Compute phase04 status value
+  set_fact:
+    phase04_status_value: >-
+      {{
+        'pre-not-ready' if not phase04_pre_ready
+        else
+        (
+          'cur-success' if phase04_ready
+          else
+          (
+            'cur-failed' if phase04_state is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
+- name: Set phase04 status
+  set_fact:
+    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase04_status_value }) }}"
+
+- name: Check phase04 status change
+  set_fact:
+    phase04_status_changed: >-
+      {{
+        (phase04_status_prev is not defined) or
+        (phase04_status_prev.status | default('') != phase04_status_value)
+      }}
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase04_status_now
+  changed_when: false
+
+- name: Write phase04 status file
+  copy:
+    dest: /var/lib/infra/phase/04/status.json
+    content: "{{ {'phase': '04', 'status': phase04_status_value, 'timestamp': phase04_status_now.stdout} | to_nice_json }}"
+    mode: "0644"
+  when: phase04_status_changed | default(true)

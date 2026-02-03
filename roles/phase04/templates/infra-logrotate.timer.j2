@@ -1,0 +1,10 @@
+[Unit]
+Description=Run infra logrotate
+
+[Timer]
+OnCalendar={{ phase04_logrotate_on_calendar | default('daily') }}
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

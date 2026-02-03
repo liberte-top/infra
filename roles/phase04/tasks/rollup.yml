@@ -1,0 +1,181 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase04 state dir
+  file:
+    path: /var/lib/infra/phase/04
+    state: directory
+    mode: "0755"
+
+- name: Stat phase04 state file
+  stat:
+    path: /var/lib/infra/phase/04/state.json
+  register: phase04_state_stat
+
+- name: Read phase04 state file
+  slurp:
+    src: /var/lib/infra/phase/04/state.json
+  register: phase04_state_raw
+  when: phase04_state_stat.stat.exists
+
+- name: Parse phase04 state
+  when: phase04_state_raw is defined and phase04_state_raw.content is defined
+  set_fact:
+    phase04_state_prev: "{{ phase04_state_raw.content | b64decode | from_json }}"
+
+- name: Set phase04 defaults
+  set_fact:
+    phase04_image_gc_log_path: "{{ phase04_image_gc_log_path | default('/var/log/infra/k8s-image-gc.log') }}"
+    phase04_image_keep_count: "{{ phase04_image_keep_count | default(3) }}"
+    phase04_image_gc_on_calendar: "{{ phase04_image_gc_on_calendar | default('daily') }}"
+    phase04_logrotate_on_calendar: "{{ phase04_logrotate_on_calendar | default('daily') }}"
+    phase04_logrotate_config_path: "{{ phase04_logrotate_config_path | default('/etc/infra/logrotate.d/infra-maint') }}"
+    phase04_logrotate_state_path: "{{ phase04_logrotate_state_path | default('/var/lib/infra/logrotate.status') }}"
+    phase04_image_gc_script_path: "{{ phase04_image_gc_script_path | default('/usr/local/sbin/infra/k8s-image-gc') }}"
+
+- name: Ensure infra log dir
+  file:
+    path: /var/log/infra
+    state: directory
+    mode: "0755"
+
+- name: Ensure infra script dir
+  file:
+    path: /usr/local/sbin/infra
+    state: directory
+    mode: "0755"
+
+- name: Ensure infra logrotate dir
+  file:
+    path: /etc/infra/logrotate.d
+    state: directory
+    mode: "0755"
+
+- name: Ensure logrotate is installed
+  apt:
+    name: logrotate
+    state: present
+    update_cache: true
+
+- name: Install k8s image gc script
+  template:
+    src: k8s-image-gc.py.j2
+    dest: "{{ phase04_image_gc_script_path }}"
+    mode: "0755"
+
+- name: Install logrotate config
+  template:
+    src: infra-maint.logrotate.j2
+    dest: "{{ phase04_logrotate_config_path }}"
+    mode: "0644"
+
+- name: Install systemd unit (k8s image gc service)
+  template:
+    src: infra-k8s-image-gc.service.j2
+    dest: /etc/systemd/system/infra-k8s-image-gc.service
+    mode: "0644"
+
+- name: Install systemd unit (k8s image gc timer)
+  template:
+    src: infra-k8s-image-gc.timer.j2
+    dest: /etc/systemd/system/infra-k8s-image-gc.timer
+    mode: "0644"
+
+- name: Install systemd unit (logrotate service)
+  template:
+    src: infra-logrotate.service.j2
+    dest: /etc/systemd/system/infra-logrotate.service
+    mode: "0644"
+
+- name: Install systemd unit (logrotate timer)
+  template:
+    src: infra-logrotate.timer.j2
+    dest: /etc/systemd/system/infra-logrotate.timer
+    mode: "0644"
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Enable and start infra timers
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - infra-k8s-image-gc.timer
+    - infra-logrotate.timer
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase04_now
+  changed_when: false
+
+- name: Build phase04 state
+  set_fact:
+    phase04_state:
+      phase: "04"
+      ok: true
+      timestamp: "{{ phase04_now.stdout }}"
+      scheduler: "systemd"
+      logrotate:
+        on_calendar: "{{ phase04_logrotate_on_calendar }}"
+        config_path: "{{ phase04_logrotate_config_path }}"
+        state_path: "{{ phase04_logrotate_state_path }}"
+        log_path: "{{ phase04_image_gc_log_path }}"
+        rotate: 3
+        size: "100M"
+      image_gc:
+        on_calendar: "{{ phase04_image_gc_on_calendar }}"
+        keep_per_name: "{{ phase04_image_keep_count }}"
+        log_path: "{{ phase04_image_gc_log_path }}"
+        script_path: "{{ phase04_image_gc_script_path }}"
+        lock_path: "/var/lock/infra-k8s-image-gc.lock"
+        timeout: 1800
+
+- name: Build phase04 state compare
+  set_fact:
+    phase04_state_compact:
+      phase: "04"
+      ok: true
+      scheduler: "systemd"
+      logrotate:
+        on_calendar: "{{ phase04_logrotate_on_calendar }}"
+        config_path: "{{ phase04_logrotate_config_path }}"
+        state_path: "{{ phase04_logrotate_state_path }}"
+        log_path: "{{ phase04_image_gc_log_path }}"
+        rotate: 3
+        size: "100M"
+      image_gc:
+        on_calendar: "{{ phase04_image_gc_on_calendar }}"
+        keep_per_name: "{{ phase04_image_keep_count }}"
+        log_path: "{{ phase04_image_gc_log_path }}"
+        script_path: "{{ phase04_image_gc_script_path }}"
+        lock_path: "/var/lock/infra-k8s-image-gc.lock"
+        timeout: 1800
+    phase04_state_prev_compact: >-
+      {{
+        (phase04_state_prev | default({}))
+        | dict2items
+        | rejectattr('key', 'equalto', 'timestamp')
+        | items2dict
+      }}
+
+- name: Check phase04 state change
+  set_fact:
+    phase04_state_changed: >-
+      {{
+        (phase04_state_prev is not defined) or
+        (phase04_state_prev_compact != phase04_state_compact)
+      }}
+
+- name: Write phase04 state file
+  copy:
+    dest: /var/lib/infra/phase/04/state.json
+    content: "{{ phase04_state | to_nice_json }}"
+    mode: "0644"
+  when: phase04_state_changed | default(true)

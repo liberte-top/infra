@@ -1,0 +1,12 @@
+[Unit]
+Description=Infra logrotate (custom)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/logrotate -s /var/lib/infra/logrotate.status /etc/infra/logrotate.d/infra-maint
+TimeoutStartSec=300
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

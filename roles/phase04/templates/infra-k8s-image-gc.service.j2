@@ -1,0 +1,14 @@
+[Unit]
+Description=Infra k8s image garbage collection
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /var/lock/infra-k8s-image-gc.lock /usr/local/sbin/infra/k8s-image-gc
+TimeoutStartSec=1800
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

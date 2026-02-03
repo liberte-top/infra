@@ -1,0 +1,10 @@
+[Unit]
+Description=Run infra k8s image garbage collection
+
+[Timer]
+OnCalendar={{ phase04_image_gc_on_calendar | default('daily') }}
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

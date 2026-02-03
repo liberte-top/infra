@@ -1,0 +1,51 @@
+---
+- name: Stop and disable infra timers
+  systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - infra-k8s-image-gc.timer
+    - infra-logrotate.timer
+  failed_when: false
+
+- name: Remove systemd unit files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/infra-k8s-image-gc.service
+    - /etc/systemd/system/infra-k8s-image-gc.timer
+    - /etc/systemd/system/infra-logrotate.service
+    - /etc/systemd/system/infra-logrotate.timer
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Remove k8s image gc script
+  file:
+    path: /usr/local/sbin/infra/k8s-image-gc
+    state: absent
+
+- name: Remove logrotate config
+  file:
+    path: /etc/infra/logrotate.d/infra-maint
+    state: absent
+
+- name: Remove logrotate state file
+  file:
+    path: /var/lib/infra/logrotate.status
+    state: absent
+
+- name: Remove k8s image gc logs
+  shell: rm -f /var/log/infra/k8s-image-gc.log*
+  args:
+    warn: false
+  changed_when: false
+  failed_when: false
+
+- name: Remove phase04 state file
+  file:
+    path: /var/lib/infra/phase/04/state.json
+    state: absent

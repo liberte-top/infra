@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+import datetime
+import json
+import os
+import subprocess
+import sys
+from typing import Dict, List, Set
+
+CRICTL = os.environ.get("PHASE04_CRICTL", "crictl")
+LOG_PATH = "{{ phase04_image_gc_log_path }}"
+KEEP_PER_NAME = int("{{ phase04_image_keep_count | default(3) }}")
+
+
+def utc_now():
+    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+
+
+def log(line: str) -> None:
+    ts = utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    msg = f"{ts} {line}\n"
+    try:
+        with open(LOG_PATH, "a", encoding="utf-8") as fh:
+            fh.write(msg)
+    except Exception as exc:
+        sys.stderr.write(f"failed to write log: {exc}\n")
+    sys.stdout.write(msg)
+
+
+def run(cmd: List[str]) -> str:
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"command failed: {' '.join(cmd)} rc={result.returncode} err={result.stderr.strip()}")
+    return result.stdout
+
+
+def parse_time(value: str) -> datetime.datetime:
+    if not value:
+        return datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    try:
+        return datetime.datetime.fromisoformat(value)
+    except Exception:
+        return datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
+
+
+def load_images() -> List[dict]:
+    payload = json.loads(run([CRICTL, "images", "-o", "json"]))
+    return payload.get("images", [])
+
+
+def load_containers() -> List[dict]:
+    payload = json.loads(run([CRICTL, "ps", "-a", "-o", "json"]))
+    return payload.get("containers", [])
+
+
+def load_created(image_id: str, cache: Dict[str, datetime.datetime]) -> datetime.datetime:
+    if image_id in cache:
+        return cache[image_id]
+    payload = json.loads(run([CRICTL, "inspecti", "-o", "json", image_id]))
+    created = payload.get("info", {}).get("imageSpec", {}).get("created", "")
+    parsed = parse_time(created)
+    cache[image_id] = parsed
+    return parsed
+
+
+def main() -> int:
+    log("image-gc start")
+    images = load_images()
+    containers = load_containers()
+
+    used_ids: Set[str] = set()
+    for container in containers:
+        image_ref = container.get("imageRef", "")
+        if image_ref:
+            used_ids.add(image_ref)
+        image_val = (container.get("image") or {}).get("image", "")
+        if image_val.startswith("sha256:"):
+            used_ids.add(image_val)
+
+    created_cache: Dict[str, datetime.datetime] = {}
+    grouped: Dict[str, Dict[str, datetime.datetime]] = {}
+
+    for image in images:
+        image_id = image.get("id")
+        repo_tags = image.get("repoTags") or []
+        filtered_tags = [tag for tag in repo_tags if tag and tag != "<none>:<none>"]
+        if not image_id or not filtered_tags:
+            continue
+        created = load_created(image_id, created_cache)
+        for tag in filtered_tags:
+            base = tag.rsplit(":", 1)[0]
+            grouped.setdefault(base, {})
+            existing = grouped[base].get(image_id)
+            if existing is None or created > existing:
+                grouped[base][image_id] = created
+
+    keep_ids: Set[str] = set()
+    for base, image_map in grouped.items():
+        sorted_images = sorted(image_map.items(), key=lambda item: item[1], reverse=True)
+        for image_id, _ in sorted_images[:KEEP_PER_NAME]:
+            keep_ids.add(image_id)
+
+    delete_ids: List[str] = []
+    for image in images:
+        image_id = image.get("id")
+        if not image_id:
+            continue
+        if image_id in used_ids:
+            continue
+        if image_id in keep_ids:
+            continue
+        delete_ids.append(image_id)
+
+    log(f"image-gc scan total={len(images)} used={len(used_ids)} keep={len(keep_ids)} delete={len(delete_ids)}")
+
+    failures = 0
+    for image_id in delete_ids:
+        try:
+            run([CRICTL, "rmi", image_id])
+            log(f"image-gc removed {image_id}")
+        except Exception as exc:
+            failures += 1
+            log(f"image-gc failed remove {image_id}: {exc}")
+
+    log(f"image-gc done failures={failures}")
+    return 0 if failures == 0 else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        log(f"image-gc fatal: {exc}")
+        sys.exit(1)
