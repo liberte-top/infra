@@ -104,7 +104,7 @@
       {{
         phase02_ufw_verbose.stdout is defined and
         ('Status: active' in phase02_ufw_verbose.stdout) and
-        ('Default: deny (incoming), allow (outgoing), deny (routed)' in phase02_ufw_verbose.stdout) and
+        ('Default: deny (incoming), allow (outgoing), allow (routed)' in phase02_ufw_verbose.stdout) and
         ('Logging: ' ~ ufw_logging in phase02_ufw_verbose.stdout)
       }}
     phase02_ufw_rules_ok: >-
@@ -171,7 +171,7 @@
 - name: Set UFW default routed policy
   ufw:
     direction: routed
-    policy: deny
+    policy: allow
 
 - name: Allow UFW ports
   ufw:

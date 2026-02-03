@@ -35,7 +35,7 @@
 - name: Check UFW defaults
   set_fact:
     phase02_ufw_active: "{{ 'Status: active' in phase02_ufw_status.stdout }}"
-    phase02_ufw_defaults_ok: "{{ 'Default: deny (incoming), allow (outgoing), deny (routed)' in phase02_ufw_status.stdout }}"
+    phase02_ufw_defaults_ok: "{{ 'Default: deny (incoming), allow (outgoing), allow (routed)' in phase02_ufw_status.stdout }}"
 
 - name: Check UFW logging
   set_fact:

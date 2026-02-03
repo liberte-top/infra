@@ -101,22 +101,6 @@
   register: phase03_sysctl_apply
   changed_when: false
 
-- name: Ensure UFW forward policy
-  lineinfile:
-    path: /etc/default/ufw
-    regexp: '^DEFAULT_FORWARD_POLICY='
-    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
-    create: false
-
-- name: Set UFW default routed policy allow
-  ufw:
-    direction: routed
-    policy: allow
-
-- name: Reload UFW
-  command: ufw reload
-  changed_when: false
-
 - name: Check k3s binary
   stat:
     path: /usr/local/bin/k3s
@@ -222,8 +206,6 @@
         addons: "default"
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
-      ufw:
-        routed_policy: "allow"
       kubeconfig:
         path: "/home/{{ k3s_admin_user }}/.kube/config"
 
