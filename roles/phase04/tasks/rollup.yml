@@ -30,7 +30,7 @@
 - name: Set phase04 defaults
   set_fact:
     phase04_image_gc_log_path: "{{ phase04_image_gc_log_path | default('/var/log/infra/k8s-image-gc.log') }}"
-    phase04_auth_deploy_log_path: "{{ phase04_auth_deploy_log_path | default('/var/log/infra/auth-deploy.log') }}"
+    phase04_deploy_log_glob: "{{ phase04_deploy_log_glob | default('/var/log/infra/*.deploy.log') }}"
     phase04_image_keep_count: "{{ phase04_image_keep_count | default(3) }}"
     phase04_image_gc_on_calendar: "{{ phase04_image_gc_on_calendar | default('daily') }}"
     phase04_logrotate_on_calendar: "{{ phase04_logrotate_on_calendar | default('daily') }}"
@@ -127,6 +127,7 @@
         on_calendar: "{{ phase04_logrotate_on_calendar }}"
         config_path: "{{ phase04_logrotate_config_path }}"
         state_path: "{{ phase04_logrotate_state_path }}"
+        deploy_log_glob: "{{ phase04_deploy_log_glob }}"
         log_path: "{{ phase04_image_gc_log_path }}"
         rotate: 3
         size: "100M"
@@ -148,6 +149,7 @@
         on_calendar: "{{ phase04_logrotate_on_calendar }}"
         config_path: "{{ phase04_logrotate_config_path }}"
         state_path: "{{ phase04_logrotate_state_path }}"
+        deploy_log_glob: "{{ phase04_deploy_log_glob }}"
         log_path: "{{ phase04_image_gc_log_path }}"
         rotate: 3
         size: "100M"
