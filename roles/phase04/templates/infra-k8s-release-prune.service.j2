@@ -1,0 +1,6 @@
+[Unit]
+Description=Prune old k8s release manifests
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -lc 'set -euo pipefail; ROOT="{{ phase04_release_root }}"; KEEP={{ phase04_release_prune_keep_count }}; if [ ! -d "$ROOT" ]; then exit 0; fi; find "$ROOT" -mindepth 1 -maxdepth 1 -type d -printf "%T@ %p\n" | sort -nr | tail -n +$((KEEP+1)) | cut -d" " -f2- | xargs -r rm -rf'

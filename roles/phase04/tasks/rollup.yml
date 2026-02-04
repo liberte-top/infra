@@ -37,6 +37,9 @@
     phase04_logrotate_config_path: "{{ phase04_logrotate_config_path | default('/etc/infra/logrotate.d/infra-maint') }}"
     phase04_logrotate_state_path: "{{ phase04_logrotate_state_path | default('/var/lib/infra/logrotate.status') }}"
     phase04_image_gc_script_path: "{{ phase04_image_gc_script_path | default('/usr/local/sbin/infra/k8s-image-gc') }}"
+    phase04_release_root: "{{ phase04_release_root | default('/home/k8s-admin/releases') }}"
+    phase04_release_prune_keep_count: "{{ phase04_release_prune_keep_count | default(3) }}"
+    phase04_release_prune_on_calendar: "{{ phase04_release_prune_on_calendar | default('daily') }}"
 
 - name: Ensure infra log dir
   file:
@@ -53,6 +56,12 @@
 - name: Ensure infra logrotate dir
   file:
     path: /etc/infra/logrotate.d
+    state: directory
+    mode: "0755"
+
+- name: Ensure k8s release dir
+  file:
+    path: "{{ phase04_release_root }}"
     state: directory
     mode: "0755"
 
@@ -98,6 +107,18 @@
     dest: /etc/systemd/system/infra-logrotate.timer
     mode: "0644"
 
+- name: Install systemd unit (k8s release prune service)
+  template:
+    src: infra-k8s-release-prune.service.j2
+    dest: /etc/systemd/system/infra-k8s-release-prune.service
+    mode: "0644"
+
+- name: Install systemd unit (k8s release prune timer)
+  template:
+    src: infra-k8s-release-prune.timer.j2
+    dest: /etc/systemd/system/infra-k8s-release-prune.timer
+    mode: "0644"
+
 - name: Reload systemd
   systemd:
     daemon_reload: true
@@ -110,6 +131,7 @@
   loop:
     - infra-k8s-image-gc.timer
     - infra-logrotate.timer
+    - infra-k8s-release-prune.timer
 
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
@@ -138,6 +160,10 @@
         script_path: "{{ phase04_image_gc_script_path }}"
         lock_path: "/var/lock/infra-k8s-image-gc.lock"
         timeout: 1800
+      release_prune:
+        on_calendar: "{{ phase04_release_prune_on_calendar }}"
+        keep_count: "{{ phase04_release_prune_keep_count }}"
+        root_path: "{{ phase04_release_root }}"
 
 - name: Build phase04 state compare
   set_fact:
@@ -160,6 +186,10 @@
         script_path: "{{ phase04_image_gc_script_path }}"
         lock_path: "/var/lock/infra-k8s-image-gc.lock"
         timeout: 1800
+      release_prune:
+        on_calendar: "{{ phase04_release_prune_on_calendar }}"
+        keep_count: "{{ phase04_release_prune_keep_count }}"
+        root_path: "{{ phase04_release_root }}"
     phase04_state_prev_compact: >-
       {{
         (phase04_state_prev | default({}))

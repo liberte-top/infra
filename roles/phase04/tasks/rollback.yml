@@ -7,6 +7,7 @@
   loop:
     - infra-k8s-image-gc.timer
     - infra-logrotate.timer
+    - infra-k8s-release-prune.timer
   failed_when: false
 
 - name: Remove systemd unit files
@@ -18,6 +19,8 @@
     - /etc/systemd/system/infra-k8s-image-gc.timer
     - /etc/systemd/system/infra-logrotate.service
     - /etc/systemd/system/infra-logrotate.timer
+    - /etc/systemd/system/infra-k8s-release-prune.service
+    - /etc/systemd/system/infra-k8s-release-prune.timer
 
 - name: Reload systemd
   systemd:

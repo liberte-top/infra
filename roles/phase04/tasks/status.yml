@@ -51,6 +51,7 @@
   set_fact:
     phase04_image_gc_script_path: "{{ phase04_image_gc_script_path | default('/usr/local/sbin/infra/k8s-image-gc') }}"
     phase04_logrotate_config_path: "{{ phase04_logrotate_config_path | default('/etc/infra/logrotate.d/infra-maint') }}"
+    phase04_release_prune_timer: "{{ phase04_release_prune_timer | default('infra-k8s-release-prune.timer') }}"
 
 - name: Check k8s image gc script
   stat:
@@ -74,6 +75,12 @@
   changed_when: false
   failed_when: false
 
+- name: Check infra k8s release prune timer
+  command: "systemctl is-active {{ phase04_release_prune_timer }}"
+  register: phase04_release_prune_timer_state
+  changed_when: false
+  failed_when: false
+
 - name: Compute phase04 readiness
   set_fact:
     phase04_ready: >-
@@ -81,7 +88,8 @@
         phase04_image_gc_script_stat.stat.exists and
         phase04_logrotate_config_stat.stat.exists and
         (phase04_image_gc_timer.stdout | default('')) == 'active' and
-        (phase04_logrotate_timer.stdout | default('')) == 'active'
+        (phase04_logrotate_timer.stdout | default('')) == 'active' and
+        (phase04_release_prune_timer_state.stdout | default('')) == 'active'
       }}
 
 - name: Compute phase04 status value

@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily prune of k8s release manifests
+
+[Timer]
+OnCalendar={{ phase04_release_prune_on_calendar | default('daily') }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
