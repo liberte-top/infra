@@ -64,6 +64,8 @@
     path: "{{ phase04_release_root }}"
     state: directory
     mode: "0755"
+    owner: k8s-admin
+    group: k8s-admin
 
 - name: Ensure logrotate is installed
   apt:
