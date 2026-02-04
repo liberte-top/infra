@@ -73,6 +73,11 @@
     state: present
     update_cache: true
 
+- name: Ensure rsync is installed
+  apt:
+    name: rsync
+    state: present
+
 - name: Install k8s image gc script
   template:
     src: k8s-image-gc.py.j2
