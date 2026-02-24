@@ -1,20 +1,20 @@
 ---
-- name: Read phase00 state file
+- name: Read phase00 facts file
   slurp:
-    src: /var/lib/infra/phase/00/state.json
-  register: phase00_state_raw
+    src: /var/lib/infra/phase/00/facts.json
+  register: phase00_facts_raw
   ignore_errors: true
 
-- name: Parse phase00 state
-  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+- name: Parse phase00 facts
+  when: phase00_facts_raw is defined and phase00_facts_raw.content is defined
   set_fact:
-    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+    phase00_facts: "{{ phase00_facts_raw.content | b64decode | from_json }}"
 
 - name: Determine packages to remove
-  when: phase00_state is defined
+  when: phase00_facts is defined
   set_fact:
     phase00_remove:
-      "{{ phase00_state.packages.desired | difference(phase00_state.packages.pre_installed) }}"
+      "{{ phase00_facts.packages.desired | difference(phase00_facts.packages.pre_installed) }}"
 
 - name: Remove packages installed by phase00
   when: phase00_remove is defined and phase00_remove | length > 0
@@ -23,17 +23,17 @@
     state: absent
     purge: false
 
-- name: Remove phase00 state file
+- name: Remove phase00 facts file
   file:
-    path: /var/lib/infra/phase/00/state.json
+    path: /var/lib/infra/phase/00/facts.json
     state: absent
 
-- name: Remove phase00 status file
+- name: Remove legacy phase00 status file (cleanup)
   file:
     path: /var/lib/infra/phase/00/status.json
     state: absent
 
-- name: Remove phase00 state dir (if empty)
+- name: Remove phase00 phase dir (if empty)
   file:
     path: /var/lib/infra/phase/00
     state: absent

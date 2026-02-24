@@ -24,26 +24,26 @@
       - logrotate
       - python3
 
-- name: Read phase00 state file
+- name: Read phase00 facts file
   slurp:
-    src: /var/lib/infra/phase/00/state.json
-  register: phase00_state_raw
+    src: /var/lib/infra/phase/00/facts.json
+  register: phase00_facts_raw
   ignore_errors: true
 
-- name: Parse phase00 state
-  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+- name: Parse phase00 facts
+  when: phase00_facts_raw is defined and phase00_facts_raw.content is defined
   set_fact:
-    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
+    phase00_facts: "{{ phase00_facts_raw.content | b64decode | from_json }}"
 
 - name: Check baseline packages installed
   command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_desired_packages | join(' ') }}"
   register: phase00_pkg_checks
   changed_when: false
   failed_when: false
-  when: phase00_state is defined
+  when: phase00_facts is defined
 
 - name: Compute phase00 short-circuit readiness
-  when: phase00_state is defined
+  when: phase00_facts is defined
   set_fact:
     phase00_packages_ok: >-
       {{
@@ -51,17 +51,17 @@
         (phase00_pkg_checks.stdout_lines | select('search', ' install ok installed$') | list | length
           == (phase00_desired_packages | length))
       }}
-    phase00_state_matches: >-
+    phase00_facts_matches: >-
       {{
-        phase00_state is defined and
-        (phase00_state.phase | default('')) == '00' and
-        (phase00_state.packages.desired | default([])) == phase00_desired_packages
+        phase00_facts is defined and
+        (phase00_facts.phase | default('')) == '00' and
+        (phase00_facts.packages.desired | default([])) == phase00_desired_packages
       }}
 
 - name: Compute phase00 skip flag
-  when: phase00_state is defined
+  when: phase00_facts is defined
   set_fact:
-    phase00_skip: "{{ phase00_packages_ok and phase00_state_matches }}"
+    phase00_skip: "{{ phase00_packages_ok and phase00_facts_matches }}"
 
 - name: Skip phase00 rollup when already ready
   meta: end_role
@@ -104,9 +104,9 @@
   register: phase00_now
   changed_when: false
 
-- name: Build phase00 state
+- name: Build phase00 facts
   set_fact:
-    phase00_state:
+    phase00_facts:
       phase: "00"
       ok: true
       timestamp: "{{ phase00_now.stdout }}"
@@ -123,8 +123,8 @@
           - python3
         pre_installed: "{{ phase00_pre_installed }}"
 
-- name: Write phase00 state file
+- name: Write phase00 facts file
   copy:
-    dest: /var/lib/infra/phase/00/state.json
-    content: "{{ phase00_state | to_nice_json }}"
+    dest: /var/lib/infra/phase/00/facts.json
+    content: "{{ phase00_facts | to_nice_json }}"
     mode: "0644"

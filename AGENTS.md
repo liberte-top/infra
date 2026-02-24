@@ -13,6 +13,48 @@
 - Execution entry is `scripts/ansible.sh`.
 - Infrastructure desired state lives in `playbooks/` and `roles/`.
 
+## Repository Structure (Refactor Map)
+Use this as the baseline module map before refactoring.
+
+```text
+infra/
+├── .github/workflows/        # CI entrypoints (rollup / rollback workflow dispatch)
+├── inventory/                # Ansible inventory + group/host vars
+│   ├── hosts.ini
+│   ├── group_vars/all.yml
+│   └── host_vars/prod-control-01.yml
+├── playbooks/                # Top-level orchestration playbooks
+│   ├── rollup.yml
+│   ├── rollback.yml
+│   ├── status.yml
+│   └── phases/phase_00.yml..phase_05.yml  # Per-phase role dispatch
+├── roles/                    # Desired state implementation by phase
+│   ├── phase00..phase05/
+│   │   ├── tasks/{rollup,rollback,status}.yml
+│   │   └── templates/        # Present in phase02/phase04
+├── scripts/                  # Operational entrypoints and local tooling
+│   ├── ansible.sh            # Single ansible runtime wrapper (containerized)
+│   ├── ssh.sh                # Direct SSH connectivity helper
+│   ├── utils.sh              # Shared shell helpers for scripts
+│   └── ci.sh                 # GitHub Actions workflow trigger helper
+├── ansible.cfg               # Local ansible defaults
+├── .env(.example)            # Runtime parameters
+├── BOOTSTRAP.md              # Phase -1 manual server bootstrap
+└── AGENTS.md                 # Collaboration and execution conventions
+```
+
+## Phase Ownership Snapshot
+- `phase00`: base OS packages and phase state bootstrap.
+- `phase01`: SSH hardening + admin user/sudo baseline.
+- `phase02`: UFW + sysctl hardening.
+- `phase03`: k3s install/verify lifecycle.
+- `phase04`: maintenance timers (image GC, logrotate, release prune).
+- `phase05`: helm + cert-manager lifecycle.
+
+## Phase Runtime Files
+- Persist phase facts in `/var/lib/infra/phase/<id>/facts.json`.
+- `status` playbook computes and prints live status; do not persist per-phase `status.json` going forward.
+
 ## Runtime Parameters
 - `ANSIBLE_IMAGE`: execution environment image for ansible commands.
 - `INFRA_SSH_HOST`: target host/IP for ansible inventory host.

@@ -3,44 +3,26 @@
   set_fact:
     phase00_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
-- name: Ensure infra phase base dir
-  file:
-    path: /var/lib/infra/phase
-    state: directory
-    mode: "0755"
+- name: Stat phase00 facts file
+  stat:
+    path: /var/lib/infra/phase/00/facts.json
+  register: phase00_facts_stat
 
-- name: Ensure phase00 state dir
-  file:
-    path: /var/lib/infra/phase/00
-    state: directory
-    mode: "0755"
-
-- name: Read phase00 state file
+- name: Read phase00 facts file
   slurp:
-    src: /var/lib/infra/phase/00/state.json
-  register: phase00_state_raw
-  ignore_errors: true
+    src: /var/lib/infra/phase/00/facts.json
+  register: phase00_facts_raw
+  when: phase00_facts_stat.stat.exists
 
-- name: Read phase00 status file
-  slurp:
-    src: /var/lib/infra/phase/00/status.json
-  register: phase00_status_raw
-  ignore_errors: true
-
-- name: Parse phase00 state
-  when: phase00_state_raw is defined and phase00_state_raw.content is defined
+- name: Parse phase00 facts
+  when: phase00_facts_raw is defined and phase00_facts_raw.content is defined
   set_fact:
-    phase00_state: "{{ phase00_state_raw.content | b64decode | from_json }}"
-
-- name: Parse phase00 status
-  when: phase00_status_raw is defined and phase00_status_raw.content is defined
-  set_fact:
-    phase00_status_prev: "{{ phase00_status_raw.content | b64decode | from_json }}"
+    phase00_facts: "{{ phase00_facts_raw.content | b64decode | from_json }}"
 
 - name: Check installed packages (dpkg, batch)
-  command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_state.packages.desired | join(' ') }}"
+  command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_facts.packages.desired | join(' ') }}"
   register: phase00_pkg_checks
-  when: phase00_state is defined
+  when: phase00_facts is defined
   failed_when: false
   changed_when: false
 
@@ -48,8 +30,8 @@
   set_fact:
     phase00_packages_present: >-
       {{
-        phase00_state is defined and
-        (phase00_pkg_checks.stdout_lines | select('search', ' install ok installed$') | list | length == phase00_state.packages.desired | length)
+        phase00_facts is defined and
+        (phase00_pkg_checks.stdout_lines | select('search', ' install ok installed$') | list | length == phase00_facts.packages.desired | length)
       }}
 
 - name: Compute phase00 status value
@@ -62,7 +44,7 @@
           'cur-success' if phase00_packages_present
           else
           (
-            'cur-failed' if phase00_state is defined
+            'cur-failed' if phase00_facts is defined
             else 'pre-ready'
           )
         )
@@ -71,23 +53,3 @@
 - name: Set phase00 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase00_status_value }) }}"
-
-- name: Check phase00 status change
-  set_fact:
-    phase00_status_changed: >-
-      {{
-        (phase00_status_prev is not defined) or
-        (phase00_status_prev.status | default('') != phase00_status_value)
-      }}
-
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase00_status_now
-  changed_when: false
-
-- name: Write phase00 status file
-  copy:
-    dest: /var/lib/infra/phase/00/status.json
-    content: "{{ {'phase': '00', 'status': phase00_status_value, 'timestamp': phase00_status_now.stdout} | to_nice_json }}"
-    mode: "0644"
-  when: phase00_status_changed | default(true)

@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-infra_root="$(cd "${script_dir}/.." && pwd)"
+# Usage: run from infra/ directory so relative paths resolve (./scripts, ./.env).
+# Examples:
+#   ./scripts/ansible.sh
+#   ./scripts/ansible.sh playbooks/status.yml -e phase_target=00
+# shellcheck source=./scripts/utils.sh
+source "./scripts/utils.sh" && __infra_utils_guard__
+
 ansible_image_default="ghcr.io/ansible-community/community-ee-base:2.19.5-1"
 default_cmd=(ansible)
 docker_tty=(-i)
@@ -10,30 +15,18 @@ if [[ -t 0 ]]; then
   docker_tty=(-it)
 fi
 
-env_file="${infra_root}/.env"
-if [[ ! -f "${env_file}" ]]; then
-  echo "Missing ${env_file}. Create it from ${infra_root}/.env.example." >&2
-  exit 1
-fi
+load_env_file
 
-set -a
-# shellcheck source=/dev/null
-source "${env_file}"
-set +a
-
-if [[ -z "${INFRA_SSH_HOST:-}" ]]; then
-  INFRA_SSH_HOST="${INFRA_HOST:-}"
-fi
-if [[ -z "${INFRA_SSH_USER:-}" ]]; then
-  INFRA_SSH_USER="${INFRA_USER:-root}"
-fi
+require_env INFRA_SSH_HOST
+require_env INFRA_SSH_USER
+require_env INFRA_SSH_PRIVATE_KEY_B64
 
 ANSIBLE_IMAGE="${ANSIBLE_IMAGE:-$ansible_image_default}"
 
 docker_args=(
   "${docker_tty[@]}"
   --rm
-  -v "${infra_root}:/work"
+  -v "${PWD}:/work"
   -w /work
   -e "ANSIBLE_CONFIG=/work/ansible.cfg"
   -e "INFRA_SSH_HOST=${INFRA_SSH_HOST:-}"
@@ -43,12 +36,10 @@ docker_args=(
 
 if [[ $# -eq 0 ]]; then
   docker run "${docker_args[@]}" "${ANSIBLE_IMAGE}" /bin/sh -lc '
-      if [ -n "${INFRA_SSH_PRIVATE_KEY_B64:-}" ]; then
-        umask 077
-        key_file=/tmp/infra_ssh_key
-        echo "$INFRA_SSH_PRIVATE_KEY_B64" | base64 -d > "$key_file"
-        export INFRA_SSH_PRIVATE_KEY_FILE="$key_file"
-      fi
+      umask 077
+      key_file=/tmp/infra_ssh_key
+      echo "$INFRA_SSH_PRIVATE_KEY_B64" | base64 -d > "$key_file"
+      export INFRA_SSH_PRIVATE_KEY_FILE="$key_file"
       exec /bin/sh
     '
   exit 0
@@ -64,11 +55,9 @@ for arg in "$@"; do
 done
 
 docker run "${docker_args[@]}" "${ANSIBLE_IMAGE}" /bin/sh -lc '
-    if [ -n "${INFRA_SSH_PRIVATE_KEY_B64:-}" ]; then
-      umask 077
-      key_file=/tmp/infra_ssh_key
-      echo "$INFRA_SSH_PRIVATE_KEY_B64" | base64 -d > "$key_file"
-      export INFRA_SSH_PRIVATE_KEY_FILE="$key_file"
-    fi
+    umask 077
+    key_file=/tmp/infra_ssh_key
+    echo "$INFRA_SSH_PRIVATE_KEY_B64" | base64 -d > "$key_file"
+    export INFRA_SSH_PRIVATE_KEY_FILE="$key_file"
     exec "$@"
   ' -- "${default_cmd[@]}" "$@"
