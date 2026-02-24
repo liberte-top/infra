@@ -24,11 +24,16 @@
       - logrotate
       - python3
 
+- name: Stat phase00 facts file
+  stat:
+    path: /var/lib/infra/phase/00/facts.json
+  register: phase00_facts_stat
+
 - name: Read phase00 facts file
+  when: phase00_facts_stat.stat.exists
   slurp:
     src: /var/lib/infra/phase/00/facts.json
   register: phase00_facts_raw
-  ignore_errors: true
 
 - name: Parse phase00 facts
   when: phase00_facts_raw is defined and phase00_facts_raw.content is defined

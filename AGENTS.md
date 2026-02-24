@@ -75,6 +75,13 @@ infra/
 - `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
 - `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
 
+## Phase00 Regression Checklist
+- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
+- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00` (idempotency pass)
+- `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
+
 ## Change Policy
 - Update ansible image version in `.env` (or `.env.example` default), not in playbooks.
 - Keep `scripts/ansible.sh` as the single operational entrypoint.
