@@ -2,17 +2,14 @@
 phase_from: "00"
 phase_to: "03"
 
-k3s_admin_user: "k8s-admin"
-k3s_admin_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjQmu8HWUWrTLAdGCeLZelsgRCQWSLWVRAX5dB4d7Nm zqxy123@ZQXY123deMacBook-Pro.local"
-
 root_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGe1WyG8hQ4HsKEy7GnhRuyuvs4zSk3BamwlEmx7WamN zqxy123@ZQXY123deMacBook-Pro.local"
 
 ssh_allow_users:
   - "root"
-  - "k8s-admin"
 
 k3s_version_lock: "v1.34.3+k3s1"
 k3s_etcd_snapshot_retention: 1
+k3s_tailscale_fqdn: "{{ ansible_host }}"
 
 ufw_allow_ports:
   - 22

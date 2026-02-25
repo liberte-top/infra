@@ -18,7 +18,7 @@
         msg:
           inventory_file: "{{ inventory_file | default('') }}"
           group_names: "{{ group_names }}"
-          k3s_admin_user: "{{ k3s_admin_user | default('UNDEFINED') }}"
+          k3s_tailscale_fqdn: "{{ k3s_tailscale_fqdn | default('UNDEFINED') }}"
           root_pubkey: "{{ root_pubkey | default('UNDEFINED') }}"
           ssh_allow_users: "{{ ssh_allow_users | default('UNDEFINED') }}"
     - name: Validate phase_target

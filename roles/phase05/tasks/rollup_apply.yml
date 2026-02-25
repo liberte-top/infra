@@ -1,0 +1,130 @@
+---
+- name: Ensure helm temp dir
+  file:
+    path: /tmp/infra-helm
+    state: directory
+    mode: "0755"
+
+- name: Build helm download URLs
+  set_fact:
+    phase05_helm_tgz_url: "https://get.helm.sh/helm-{{ phase05_helm_version }}-linux-{{ phase05_helm_arch }}.tar.gz"
+    phase05_helm_sha_url: "https://get.helm.sh/helm-{{ phase05_helm_version }}-linux-{{ phase05_helm_arch }}.tar.gz.sha256"
+
+- name: Download helm sha256
+  get_url:
+    url: "{{ phase05_helm_sha_url }}"
+    dest: /tmp/infra-helm/helm.sha256
+    mode: "0644"
+
+- name: Read helm sha256
+  slurp:
+    src: /tmp/infra-helm/helm.sha256
+  register: phase05_helm_sha_raw
+
+- name: Parse helm sha256
+  set_fact:
+    phase05_helm_sha: "{{ phase05_helm_sha_raw.content | b64decode | trim }}"
+
+- name: Download helm tarball
+  get_url:
+    url: "{{ phase05_helm_tgz_url }}"
+    dest: /tmp/infra-helm/helm.tgz
+    checksum: "sha256:{{ phase05_helm_sha }}"
+    mode: "0644"
+
+- name: Extract helm tarball
+  unarchive:
+    src: /tmp/infra-helm/helm.tgz
+    dest: /tmp/infra-helm
+    remote_src: true
+
+- name: Install helm binary
+  copy:
+    src: "/tmp/infra-helm/linux-{{ phase05_helm_arch }}/helm"
+    dest: /usr/local/bin/helm
+    mode: "0755"
+    remote_src: true
+
+- name: Install cert-manager via helm
+  command: >-
+    /usr/local/bin/helm upgrade --install "{{ cert_manager_release }}"
+    "{{ cert_manager_chart }}"
+    --version "{{ cert_manager_version_lock }}"
+    --namespace "{{ cert_manager_namespace }}"
+    --create-namespace
+    --set crds.enabled=true
+    --wait
+    --timeout 300s
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
+
+- name: Wait for cert-manager deployments
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=180s
+  register: phase05_cm_rollout_apply
+  changed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+  loop_control:
+    loop_var: phase05_deploy
+  environment:
+    KUBECONFIG: "{{ phase05_kubeconfig }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase05_now
+  changed_when: false
+
+- name: Build phase05 facts
+  set_fact:
+    phase05_facts:
+      phase: "05"
+      ok: true
+      timestamp: "{{ phase05_now.stdout }}"
+      helm:
+        version: "{{ phase05_helm_version }}"
+        path: /usr/local/bin/helm
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+
+- name: Build phase05 facts compare
+  set_fact:
+    phase05_facts_compact:
+      phase: "05"
+      ok: true
+      helm:
+        version: "{{ phase05_helm_version }}"
+        path: /usr/local/bin/helm
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+    phase05_facts_prev_compact: >-
+      {{
+        (phase05_facts_prev | default({}))
+        | dict2items
+        | rejectattr('key', 'equalto', 'timestamp')
+        | items2dict
+      }}
+
+- name: Check phase05 facts change
+  set_fact:
+    phase05_facts_changed: >-
+      {{
+        (phase05_facts_prev is not defined) or
+        (phase05_facts_prev_compact != phase05_facts_compact)
+      }}
+
+- name: Write phase05 facts file
+  copy:
+    dest: /var/lib/infra/phase/05/facts.json
+    content: "{{ phase05_facts | to_nice_json }}"
+    mode: "0644"
+  when: phase05_facts_changed | default(true)

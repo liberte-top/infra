@@ -9,43 +9,27 @@
     state: directory
     mode: "0755"
 
-- name: Ensure phase05 state dir
+- name: Ensure phase05 facts dir
   file:
     path: /var/lib/infra/phase/05
     state: directory
     mode: "0755"
 
-- name: Stat phase05 state file
+- name: Stat phase05 facts file
   stat:
-    path: /var/lib/infra/phase/05/state.json
-  register: phase05_state_stat
+    path: /var/lib/infra/phase/05/facts.json
+  register: phase05_facts_stat
 
-- name: Read phase05 state file
+- name: Read phase05 facts file
   slurp:
-    src: /var/lib/infra/phase/05/state.json
-  register: phase05_state_raw
-  when: phase05_state_stat.stat.exists
+    src: /var/lib/infra/phase/05/facts.json
+  register: phase05_facts_raw
+  when: phase05_facts_stat.stat.exists
 
-- name: Stat phase05 status file
-  stat:
-    path: /var/lib/infra/phase/05/status.json
-  register: phase05_status_stat
-
-- name: Read phase05 status file
-  slurp:
-    src: /var/lib/infra/phase/05/status.json
-  register: phase05_status_raw
-  when: phase05_status_stat.stat.exists
-
-- name: Parse phase05 state
-  when: phase05_state_raw is defined and phase05_state_raw.content is defined
+- name: Parse phase05 facts
+  when: phase05_facts_raw is defined and phase05_facts_raw.content is defined
   set_fact:
-    phase05_state: "{{ phase05_state_raw.content | b64decode | from_json }}"
-
-- name: Parse phase05 status
-  when: phase05_status_raw is defined and phase05_status_raw.content is defined
-  set_fact:
-    phase05_status_prev: "{{ phase05_status_raw.content | b64decode | from_json }}"
+    phase05_facts: "{{ phase05_facts_raw.content | b64decode | from_json }}"
 
 - name: Normalize helm version
   set_fact:
@@ -88,7 +72,7 @@
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Check cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=30s
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=30s
   register: phase05_cm_rollout
   changed_when: false
   failed_when: false
@@ -96,6 +80,8 @@
     - cert-manager
     - cert-manager-cainjector
     - cert-manager-webhook
+  loop_control:
+    loop_var: phase05_deploy
   environment:
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
@@ -134,7 +120,7 @@
           'cur-success' if phase05_ready
           else
           (
-            'cur-failed' if phase05_state is defined
+            'cur-failed' if phase05_facts is defined
             else 'pre-ready'
           )
         )
@@ -143,23 +129,3 @@
 - name: Set phase05 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase05_status_value }) }}"
-
-- name: Check phase05 status change
-  set_fact:
-    phase05_status_changed: >-
-      {{
-        (phase05_status_prev is not defined) or
-        (phase05_status_prev.status | default('') != phase05_status_value)
-      }}
-
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase05_status_now
-  changed_when: false
-
-- name: Write phase05 status file
-  copy:
-    dest: /var/lib/infra/phase/05/status.json
-    content: "{{ {'phase': '05', 'status': phase05_status_value, 'timestamp': phase05_status_now.stdout} | to_nice_json }}"
-    mode: "0644"
-  when: phase05_status_changed | default(true)

@@ -5,63 +5,45 @@
     state: directory
     mode: "0755"
 
-- name: Ensure phase01 state dir
+- name: Ensure phase01 facts dir
   file:
     path: /var/lib/infra/phase/01
     state: directory
     mode: "0755"
 
-- name: Read phase01 state file
+- name: Stat phase01 facts file
+  stat:
+    path: /var/lib/infra/phase/01/facts.json
+  register: phase01_facts_stat
+
+- name: Read phase01 facts file
+  when: phase01_facts_stat.stat.exists
   slurp:
-    src: /var/lib/infra/phase/01/state.json
-  register: phase01_state_raw
-  ignore_errors: true
+    src: /var/lib/infra/phase/01/facts.json
+  register: phase01_facts_raw
 
-- name: Parse phase01 state
-  when: phase01_state_raw is defined and phase01_state_raw.content is defined
+- name: Parse phase01 facts
+  when: phase01_facts_raw is defined and phase01_facts_raw.content is defined
   set_fact:
-    phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
-
-- name: Check admin user exists
-  command: "getent passwd {{ k3s_admin_user }}"
-  register: phase01_admin_user_check
-  changed_when: false
-  failed_when: false
-  when: phase01_state is defined
+    phase01_facts: "{{ phase01_facts_raw.content | b64decode | from_json }}"
 
 - name: Slurp root authorized_keys
   slurp:
     src: /root/.ssh/authorized_keys
   register: phase01_root_keys
   ignore_errors: true
-  when: phase01_state is defined
-
-- name: Slurp admin authorized_keys
-  slurp:
-    src: "/home/{{ k3s_admin_user }}/.ssh/authorized_keys"
-  register: phase01_admin_keys
-  ignore_errors: true
-  when: phase01_state is defined
 
 - name: Check effective sshd settings
   command: "sshd -T -C user=root"
   register: phase01_sshd_effective
   changed_when: false
   failed_when: false
-  when: phase01_state is defined
-
-- name: Compute phase01 key/sshd readiness
-  when: phase01_state is defined
+- name: Compute phase01 readiness
   set_fact:
     phase01_root_key_present: >-
       {{
         phase01_root_keys is defined and phase01_root_keys.content is defined and
-        ((phase01_root_keys.content | b64decode) | trim | length > 0)
-      }}
-    phase01_admin_key_present: >-
-      {{
-        phase01_admin_keys is defined and phase01_admin_keys.content is defined and
-        (phase01_admin_keys.content | b64decode).find(k3s_admin_pubkey) != -1
+        (phase01_root_keys.content | b64decode).find(root_pubkey) != -1
       }}
     phase01_sshd_ok: >-
       {{
@@ -73,137 +55,94 @@
         ('passwordauthentication no' in phase01_sshd_effective.stdout) and
         ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and
         ('pubkeyauthentication yes' in phase01_sshd_effective.stdout) and
-        ('allowusers root' in phase01_sshd_effective.stdout) and
-        ('allowusers ' ~ k3s_admin_user in phase01_sshd_effective.stdout)
+        ('allowusers root' in phase01_sshd_effective.stdout)
       }}
-
-- name: Compute phase01 state match
-  when: phase01_state is defined
-  set_fact:
-    phase01_state_matches: >-
+    phase01_facts_match: >-
       {{
-        (phase01_state.phase | default('')) == '01' and
-        (phase01_state.users.admin_user | default('')) == k3s_admin_user and
-        (phase01_state.users.admin_pubkey | default('')) == k3s_admin_pubkey and
-        (phase01_state.ssh.allow_users | default([])) == ssh_allow_users
+        phase01_facts is defined and
+        (phase01_facts.phase | default('')) == '01' and
+        (phase01_facts.users.root_pubkey | default('')) == root_pubkey and
+        (phase01_facts.ssh.allow_users | default([])) == ['root']
       }}
 
 - name: Compute phase01 ready flag
-  when: phase01_state is defined
   set_fact:
-    phase01_ready: >-
-      {{
-        phase01_state_matches and
-        (phase01_admin_user_check.rc == 0) and
-        phase01_root_key_present and
-        phase01_admin_key_present and
-        phase01_sshd_ok
-      }}
+    phase01_ready: "{{ phase01_facts_match and phase01_root_key_present and phase01_sshd_ok }}"
 
-- name: Compute phase01 skip flag
-  when: phase01_state is defined
-  set_fact:
-    phase01_skip: "{{ phase01_ready }}"
+- name: Apply phase01 desired state when not ready
+  when: not (phase01_ready | default(false))
+  block:
+    - name: Ensure root ssh directory
+      file:
+        path: /root/.ssh
+        state: directory
+        mode: "0700"
 
-- name: Skip phase01 rollup when already ready
-  meta: end_role
-  when: phase01_skip | default(false)
+    - name: Install root authorized key
+      authorized_key:
+        user: root
+        key: "{{ root_pubkey }}"
+        state: present
 
-- name: Ensure admin user
-  user:
-    name: "{{ k3s_admin_user }}"
-    groups: sudo
-    append: true
-    create_home: true
-    shell: /bin/bash
+    - name: Ensure sshd config drop-in dir
+      file:
+        path: /etc/ssh/sshd_config.d
+        state: directory
+        mode: "0755"
 
-- name: Ensure root ssh directory
-  file:
-    path: /root/.ssh
-    state: directory
-    mode: "0700"
+    - name: Ensure sshd base config (bootstrap baseline)
+      blockinfile:
+        path: /etc/ssh/sshd_config
+        marker: "# {mark} LIBERTE BOOTSTRAP"
+        block: |-
+          PubkeyAuthentication yes
+          KbdInteractiveAuthentication no
+          ChallengeResponseAuthentication no
+          AllowUsers root
+          PasswordAuthentication yes
 
-- name: Ensure admin ssh directory
-  file:
-    path: "/home/{{ k3s_admin_user }}/.ssh"
-    state: directory
-    mode: "0700"
-    owner: "{{ k3s_admin_user }}"
-    group: "{{ k3s_admin_user }}"
+    - name: Install sshd hardening drop-in
+      copy:
+        dest: /etc/ssh/sshd_config.d/99-liberte.conf
+        content: |-
+          PermitRootLogin without-password
+          PasswordAuthentication no
+          ChallengeResponseAuthentication no
+          KbdInteractiveAuthentication no
+          PubkeyAuthentication yes
+          AllowUsers root
+        owner: root
+        group: root
+        mode: "0644"
 
-- name: Install admin authorized key
-  authorized_key:
-    user: "{{ k3s_admin_user }}"
-    key: "{{ k3s_admin_pubkey }}"
-    state: present
+    - name: Validate sshd config
+      command: sshd -t
+      changed_when: false
 
-- name: Configure admin sudoers
-  copy:
-    dest: "/etc/sudoers.d/90-{{ k3s_admin_user }}"
-    content: "{{ k3s_admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
-    owner: root
-    group: root
-    mode: "0440"
+    - name: Reload ssh service
+      service:
+        name: ssh
+        state: reloaded
 
-- name: Ensure sshd config drop-in dir
-  file:
-    path: /etc/ssh/sshd_config.d
-    state: directory
-    mode: "0755"
+    - name: Capture UTC timestamp
+      command: date -u +%Y-%m-%dT%H:%M:%SZ
+      register: phase01_now
+      changed_when: false
 
-- name: Ensure sshd base config (bootstrap baseline)
-  blockinfile:
-    path: /etc/ssh/sshd_config
-    marker: "# {mark} LIBERTE BOOTSTRAP"
-    block: |-
-      PubkeyAuthentication yes
-      KbdInteractiveAuthentication no
-      ChallengeResponseAuthentication no
-      AllowUsers root
-      PasswordAuthentication yes
+    - name: Build phase01 facts
+      set_fact:
+        phase01_facts:
+          phase: "01"
+          ok: true
+          timestamp: "{{ phase01_now.stdout }}"
+          users:
+            root_pubkey: "{{ root_pubkey }}"
+          ssh:
+            allow_users:
+              - root
 
-- name: Install sshd hardening drop-in
-  copy:
-    dest: /etc/ssh/sshd_config.d/99-liberte.conf
-    content: |-
-      PermitRootLogin without-password
-      PasswordAuthentication no
-      ChallengeResponseAuthentication no
-      KbdInteractiveAuthentication no
-      PubkeyAuthentication yes
-      AllowUsers {{ ssh_allow_users | join(' ') }}
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Validate sshd config
-  command: sshd -t
-  changed_when: false
-
-- name: Reload ssh service
-  service:
-    name: ssh
-    state: reloaded
-
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase01_now
-  changed_when: false
-
-- name: Build phase01 state
-  set_fact:
-    phase01_state:
-      phase: "01"
-      ok: true
-      timestamp: "{{ phase01_now.stdout }}"
-      users:
-        admin_user: "{{ k3s_admin_user }}"
-        admin_pubkey: "{{ k3s_admin_pubkey }}"
-      ssh:
-        allow_users: "{{ ssh_allow_users }}"
-
-- name: Write phase01 state file
-  copy:
-    dest: /var/lib/infra/phase/01/state.json
-    content: "{{ phase01_state | to_nice_json }}"
-    mode: "0644"
+    - name: Write phase01 facts file
+      copy:
+        dest: /var/lib/infra/phase/01/facts.json
+        content: "{{ phase01_facts | to_nice_json }}"
+        mode: "0644"

@@ -15,7 +15,7 @@
   environment:
     KUBECONFIG: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
-- name: Remove phase05 state file
+- name: Remove phase05 facts file
   file:
-    path: /var/lib/infra/phase/05/state.json
+    path: /var/lib/infra/phase/05/facts.json
     state: absent

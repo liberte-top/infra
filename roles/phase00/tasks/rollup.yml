@@ -18,6 +18,7 @@
       - curl
       - jq
       - ufw
+      - tailscale
       - gnupg
       - lsb-release
       - apt-transport-https
@@ -68,68 +69,76 @@
   set_fact:
     phase00_skip: "{{ phase00_packages_ok and phase00_facts_matches }}"
 
-- name: Skip phase00 rollup when already ready
-  meta: end_role
-  when: phase00_skip | default(false)
+- name: Apply phase00 desired state when not ready
+  when: not (phase00_skip | default(false))
+  block:
+    - name: Gather current package facts
+      package_facts:
+        manager: auto
 
-- name: Gather current package facts
-  package_facts:
-    manager: auto
+    - name: Record pre-installed packages
+      set_fact:
+        phase00_pre_installed: "{{ ansible_facts.packages.keys() | list }}"
 
-- name: Record pre-installed packages
-  set_fact:
-    phase00_pre_installed: "{{ ansible_facts.packages.keys() | list }}"
+    - name: Update apt cache (bounded)
+      command: >-
+        timeout 600s apt-get
+        -o Acquire::Retries=3
+        -o Acquire::http::Timeout=30
+        -o Acquire::https::Timeout=30
+        update
+      register: phase00_apt_update
+      changed_when: false
 
-- name: Update apt cache (bounded)
-  command: >-
-    timeout 600s apt-get
-    -o Acquire::Retries=3
-    -o Acquire::http::Timeout=30
-    -o Acquire::https::Timeout=30
-    update
-  register: phase00_apt_update
-  changed_when: false
+    - name: Install tailscale package repository
+      shell: curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        executable: /bin/bash
+      register: phase00_tailscale_repo
+      changed_when: false
 
-- name: Install baseline packages
-  apt:
-    name:
-      - ca-certificates
-      - curl
-      - jq
-      - ufw
-      - gnupg
-      - lsb-release
-      - apt-transport-https
-      - logrotate
-      - python3
-    state: present
-
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase00_now
-  changed_when: false
-
-- name: Build phase00 facts
-  set_fact:
-    phase00_facts:
-      phase: "00"
-      ok: true
-      timestamp: "{{ phase00_now.stdout }}"
-      packages:
-        desired:
+    - name: Install baseline packages
+      apt:
+        name:
           - ca-certificates
           - curl
           - jq
           - ufw
+          - tailscale
           - gnupg
           - lsb-release
           - apt-transport-https
           - logrotate
           - python3
-        pre_installed: "{{ phase00_pre_installed }}"
+        state: present
 
-- name: Write phase00 facts file
-  copy:
-    dest: /var/lib/infra/phase/00/facts.json
-    content: "{{ phase00_facts | to_nice_json }}"
-    mode: "0644"
+    - name: Capture UTC timestamp
+      command: date -u +%Y-%m-%dT%H:%M:%SZ
+      register: phase00_now
+      changed_when: false
+
+    - name: Build phase00 facts
+      set_fact:
+        phase00_facts:
+          phase: "00"
+          ok: true
+          timestamp: "{{ phase00_now.stdout }}"
+          packages:
+            desired:
+              - ca-certificates
+              - curl
+              - jq
+              - ufw
+              - tailscale
+              - gnupg
+              - lsb-release
+              - apt-transport-https
+              - logrotate
+              - python3
+            pre_installed: "{{ phase00_pre_installed }}"
+
+    - name: Write phase00 facts file
+      copy:
+        dest: /var/lib/infra/phase/00/facts.json
+        content: "{{ phase00_facts | to_nice_json }}"
+        mode: "0644"

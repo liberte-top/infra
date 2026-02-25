@@ -48,7 +48,7 @@
   changed_when: false
   failed_when: false
 
-- name: Remove phase04 state file
+- name: Remove phase04 facts file
   file:
-    path: /var/lib/infra/phase/04/state.json
+    path: /var/lib/infra/phase/04/facts.json
     state: absent

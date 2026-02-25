@@ -45,9 +45,9 @@ infra/
 
 ## Phase Ownership Snapshot
 - `phase00`: base OS packages and phase state bootstrap.
-- `phase01`: SSH hardening + admin user/sudo baseline.
+- `phase01`: root-only SSH hardening baseline.
 - `phase02`: UFW + sysctl hardening.
-- `phase03`: k3s install/verify lifecycle.
+- `phase03`: k3s install/verify + tailscale kubeconfig endpoint standardization.
 - `phase04`: maintenance timers (image GC, logrotate, release prune).
 - `phase05`: helm + cert-manager lifecycle.
 
@@ -61,28 +61,36 @@ infra/
 - `INFRA_SSH_USER`: SSH user for target host.
 - `INFRA_SSH_PRIVATE_KEY_B64` (required): base64-encoded private key, decoded at runtime.
 
+## Core Inventory Variables
+- `root_pubkey`: SSH key allowed for `root`.
+- `k3s_tailscale_fqdn`: tailscale/MagicDNS endpoint used in k3s kubeconfig server URL (default `ansible_host`).
+
 ## Execution Entry
 - Always run ansible through `scripts/ansible.sh`.
 - Behavior:
-  - No arguments: open interactive shell inside the ansible image.
-  - Any `*.yml`/`*.yaml` argument: execute via `ansible-playbook`.
-  - Otherwise: execute via `ansible`.
+  - No arguments: execute `ansible --version`.
+  - With arguments: pass through directly to the container command.
 
 ## Common Commands
 - `./scripts/ssh.sh`
 - `./scripts/ssh.sh uname -a`
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=03`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
-- `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
 
 ## Phase00 Regression Checklist
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00` (idempotency pass)
-- `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=00`
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=00` (idempotency pass)
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`
 
 ## Change Policy
 - Update ansible image version in `.env` (or `.env.example` default), not in playbooks.
 - Keep `scripts/ansible.sh` as the single operational entrypoint.
 - If multi-container orchestration is required in the future, add a dedicated compose file intentionally; do not reintroduce hidden dual entrypoints.
+
+## Main Branch Guard
+- `.task/` is allowed during feature work but must not exist on `main`.
+- Promote useful task insights to permanent docs (for example `AGENTS.md`/`BOOTSTRAP.md`) before merge.
+- `main` is protected by required check `forbid-task-dir-on-main` from workflow `.github/workflows/ci.guard.yml`.

@@ -5,41 +5,41 @@
     state: directory
     mode: "0755"
 
-- name: Ensure phase02 state dir
+- name: Ensure phase02 facts dir
   file:
     path: /var/lib/infra/phase/02
     state: directory
     mode: "0755"
 
-- name: Read phase02 state file
+- name: Read phase02 facts file
   slurp:
-    src: /var/lib/infra/phase/02/state.json
-  register: phase02_state_raw
+    src: /var/lib/infra/phase/02/facts.json
+  register: phase02_facts_raw
   ignore_errors: true
 
-- name: Parse phase02 state
-  when: phase02_state_raw is defined and phase02_state_raw.content is defined
+- name: Parse phase02 facts
+  when: phase02_facts_raw is defined and phase02_facts_raw.content is defined
   set_fact:
-    phase02_state: "{{ phase02_state_raw.content | b64decode | from_json }}"
+    phase02_facts: "{{ phase02_facts_raw.content | b64decode | from_json }}"
 
-- name: Capture phase02 previous state
-  when: phase02_state is defined
+- name: Capture phase02 previous facts
+  when: phase02_facts is defined
   set_fact:
-    phase02_state_prev: "{{ phase02_state }}"
+    phase02_facts_prev: "{{ phase02_facts }}"
 
 - name: Check UFW status verbose
   command: ufw status verbose
   register: phase02_ufw_verbose
   changed_when: false
   failed_when: false
-  when: phase02_state is defined
+  when: phase02_facts is defined
 
 - name: Check UFW rules (numbered)
   command: ufw status numbered
   register: phase02_ufw_numbered
   changed_when: false
   failed_when: false
-  when: phase02_state is defined
+  when: phase02_facts is defined
 
 - name: Check UFW allow ports
   shell: |
@@ -60,7 +60,7 @@
   register: phase02_ufw_allow_check
   changed_when: false
   failed_when: false
-  when: phase02_state is defined
+  when: phase02_facts is defined
 
 - name: Check UFW limit ports
   shell: |
@@ -81,7 +81,7 @@
   register: phase02_ufw_limit_check
   changed_when: false
   failed_when: false
-  when: phase02_state is defined
+  when: phase02_facts is defined
 
 - name: Read sysctl values (procfs, batch)
   shell: |
@@ -98,10 +98,10 @@
   register: phase02_sysctl_checks
   changed_when: false
   failed_when: false
-  when: phase02_state is defined
+  when: phase02_facts is defined
 
 - name: Compute phase02 sysctl expected/actual
-  when: phase02_state is defined
+  when: phase02_facts is defined
   set_fact:
     phase02_sysctl_expected: >-
       {{
@@ -110,7 +110,7 @@
     phase02_sysctl_actual: "{{ phase02_sysctl_checks.stdout_lines | default([]) | map('trim') | list }}"
 
 - name: Compute phase02 sysctl readiness
-  when: phase02_state is defined
+  when: phase02_facts is defined
   set_fact:
     phase02_sysctl_ok: >-
       {{
@@ -119,14 +119,14 @@
       }}
 
 - name: Compute phase02 ufw readiness
-  when: phase02_state is defined
+  when: phase02_facts is defined
   set_fact:
     phase02_ufw_defaults_ok: >-
       {{
         phase02_ufw_verbose.stdout is defined and
         ('Status: active' in phase02_ufw_verbose.stdout) and
         ('Default: deny (incoming), allow (outgoing), allow (routed)' in phase02_ufw_verbose.stdout) and
-        ('Logging: ' ~ ufw_logging in phase02_ufw_verbose.stdout)
+        (('Logging: on (' ~ ufw_logging ~ ')') in phase02_ufw_verbose.stdout)
       }}
     phase02_ufw_rules_ok: >-
       {{
@@ -134,149 +134,152 @@
         (phase02_ufw_limit_check.rc | default(0)) == 0
       }}
 
-- name: Compute phase02 state match
-  when: phase02_state is defined
+- name: Compute phase02 facts match
+  when: phase02_facts is defined
   set_fact:
-    phase02_state_matches: >-
+    phase02_facts_matches: >-
       {{
-        (phase02_state.phase | default('')) == '02' and
-        (phase02_state.ufw.allow_ports | default([])) == ufw_allow_ports and
-        (phase02_state.ufw.limit_ports | default([])) == (ufw_limit_ports | default([])) and
-        (phase02_state.ufw.logging | default('')) == ufw_logging and
-        (phase02_state.ufw.ipv6_enabled | default(false)) == ufw_ipv6_enabled and
-        (phase02_state.sysctl | default({})) == liberte_sysctl
+        (phase02_facts.phase | default('')) == '02' and
+        (phase02_facts.ufw.allow_ports | default([])) == ufw_allow_ports and
+        (phase02_facts.ufw.limit_ports | default([])) == (ufw_limit_ports | default([])) and
+        (phase02_facts.ufw.logging | default('')) == ufw_logging and
+        (phase02_facts.ufw.ipv6_enabled | default(false)) == ufw_ipv6_enabled and
+        (phase02_facts.sysctl | default({})) == liberte_sysctl
       }}
 
 - name: Compute phase02 ready flag
-  when: phase02_state is defined
+  when: phase02_facts is defined
   set_fact:
     phase02_ready: >-
       {{
-        phase02_state_matches and
+        phase02_facts_matches and
         phase02_ufw_defaults_ok and
         phase02_ufw_rules_ok and
         phase02_sysctl_ok
       }}
 
 - name: Compute phase02 skip flag
-  when: phase02_state is defined
+  when: phase02_facts is defined
   set_fact:
     phase02_skip: "{{ phase02_ready }}"
 
-- name: Skip phase02 rollup when already ready
-  meta: end_role
-  when: phase02_skip | default(false)
+- name: Apply phase02 desired state when not ready
+  when: not (phase02_ready | default(false))
+  block:
+    - name: Configure UFW IPv6 setting
+      lineinfile:
+        path: /etc/default/ufw
+        regexp: '^IPV6='
+        line: "IPV6={{ 'yes' if ufw_ipv6_enabled else 'no' }}"
+        create: false
 
-- name: Configure UFW IPv6 setting
-  lineinfile:
-    path: /etc/default/ufw
-    regexp: '^IPV6='
-    line: "IPV6={{ 'yes' if ufw_ipv6_enabled else 'no' }}"
-    create: false
+    - name: Reset UFW rules
+      command: ufw --force reset
+      register: phase02_ufw_reset
+      changed_when: true
 
-- name: Reset UFW rules
-  command: ufw --force reset
-  register: phase02_ufw_reset
-  changed_when: true
+    - name: Set UFW default incoming policy
+      command: ufw default deny incoming
+      register: phase02_ufw_default_incoming
+      changed_when: true
 
-- name: Set UFW default incoming policy
-  ufw:
-    direction: incoming
-    policy: deny
+    - name: Set UFW default outgoing policy
+      command: ufw default allow outgoing
+      register: phase02_ufw_default_outgoing
+      changed_when: true
 
-- name: Set UFW default outgoing policy
-  ufw:
-    direction: outgoing
-    policy: allow
+    - name: Set UFW default routed policy
+      command: ufw default allow routed
+      register: phase02_ufw_default_routed
+      changed_when: true
 
-- name: Set UFW default routed policy
-  ufw:
-    direction: routed
-    policy: allow
+    - name: Allow UFW ports
+      command: "ufw allow {{ ufw_port }}/tcp"
+      register: phase02_ufw_allow_ports
+      changed_when: true
+      loop: "{{ ufw_allow_ports | difference(ufw_limit_ports | default([])) }}"
+      loop_control:
+        loop_var: ufw_port
 
-- name: Allow UFW ports
-  ufw:
-    rule: allow
-    port: "{{ item }}"
-    proto: tcp
-  loop: "{{ ufw_allow_ports | difference(ufw_limit_ports | default([])) }}"
+    - name: Rate limit UFW ports
+      command: "ufw limit {{ ufw_port }}/tcp"
+      register: phase02_ufw_limit_ports
+      changed_when: true
+      loop: "{{ ufw_limit_ports | default([]) }}"
+      loop_control:
+        loop_var: ufw_port
 
-- name: Rate limit UFW ports
-  ufw:
-    rule: limit
-    port: "{{ item }}"
-    proto: tcp
-  loop: "{{ ufw_limit_ports | default([]) }}"
+    - name: Configure UFW logging
+      command: "ufw logging {{ ufw_logging }}"
+      register: phase02_ufw_logging
+      changed_when: true
 
-- name: Configure UFW logging
-  ufw:
-    logging: "{{ ufw_logging }}"
+    - name: Enable UFW
+      command: ufw --force enable
+      register: phase02_ufw_enable
+      changed_when: true
 
-- name: Enable UFW
-  ufw:
-    state: enabled
+    - name: Install sysctl hardening config
+      template:
+        src: sysctl.conf.j2
+        dest: /etc/sysctl.d/99-liberte.conf
+        owner: root
+        group: root
+        mode: "0644"
 
-- name: Install sysctl hardening config
-  template:
-    src: sysctl.conf.j2
-    dest: /etc/sysctl.d/99-liberte.conf
-    owner: root
-    group: root
-    mode: "0644"
+    - name: Apply sysctl settings
+      command: sysctl --system
+      register: phase02_sysctl_apply
+      changed_when: false
 
-- name: Apply sysctl settings
-  command: sysctl --system
-  register: phase02_sysctl_apply
-  changed_when: false
+    - name: Capture UTC timestamp
+      command: date -u +%Y-%m-%dT%H:%M:%SZ
+      register: phase02_now
+      changed_when: false
 
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase02_now
-  changed_when: false
+    - name: Build phase02 facts
+      set_fact:
+        phase02_facts:
+          phase: "02"
+          ok: true
+          timestamp: "{{ phase02_now.stdout }}"
+          ufw:
+            allow_ports: "{{ ufw_allow_ports }}"
+            limit_ports: "{{ ufw_limit_ports | default([]) }}"
+            logging: "{{ ufw_logging }}"
+            ipv6_enabled: "{{ ufw_ipv6_enabled }}"
+          sysctl: "{{ liberte_sysctl }}"
 
-- name: Build phase02 state
-  set_fact:
-    phase02_state:
-      phase: "02"
-      ok: true
-      timestamp: "{{ phase02_now.stdout }}"
-      ufw:
-        allow_ports: "{{ ufw_allow_ports }}"
-        limit_ports: "{{ ufw_limit_ports | default([]) }}"
-        logging: "{{ ufw_logging }}"
-        ipv6_enabled: "{{ ufw_ipv6_enabled }}"
-      sysctl: "{{ liberte_sysctl }}"
+    - name: Build phase02 facts compare
+      set_fact:
+        phase02_facts_compact:
+          phase: "02"
+          ok: true
+          ufw:
+            allow_ports: "{{ ufw_allow_ports }}"
+            limit_ports: "{{ ufw_limit_ports | default([]) }}"
+            logging: "{{ ufw_logging }}"
+            ipv6_enabled: "{{ ufw_ipv6_enabled }}"
+          sysctl: "{{ liberte_sysctl }}"
+        phase02_facts_prev_compact: >-
+          {{
+            (phase02_facts_prev | default({}))
+            | dict2items
+            | rejectattr('key', 'equalto', 'timestamp')
+            | items2dict
+          }}
 
-- name: Build phase02 state compare
-  set_fact:
-    phase02_state_compact:
-      phase: "02"
-      ok: true
-      ufw:
-        allow_ports: "{{ ufw_allow_ports }}"
-        limit_ports: "{{ ufw_limit_ports | default([]) }}"
-        logging: "{{ ufw_logging }}"
-        ipv6_enabled: "{{ ufw_ipv6_enabled }}"
-      sysctl: "{{ liberte_sysctl }}"
-    phase02_state_prev_compact: >-
-      {{
-        (phase02_state_prev | default({}))
-        | dict2items
-        | rejectattr('key', 'equalto', 'timestamp')
-        | items2dict
-      }}
+    - name: Check phase02 facts change
+      set_fact:
+        phase02_facts_changed: >-
+          {{
+            (phase02_facts_prev is not defined) or
+            (phase02_facts_prev_compact != phase02_facts_compact)
+          }}
 
-- name: Check phase02 state change
-  set_fact:
-    phase02_state_changed: >-
-      {{
-        (phase02_state_prev is not defined) or
-        (phase02_state_prev_compact != phase02_state_compact)
-      }}
-
-- name: Write phase02 state file
-  copy:
-    dest: /var/lib/infra/phase/02/state.json
-    content: "{{ phase02_state | to_nice_json }}"
-    mode: "0644"
-  when: phase02_state_changed | default(true)
+    - name: Write phase02 facts file
+      copy:
+        dest: /var/lib/infra/phase/02/facts.json
+        content: "{{ phase02_facts | to_nice_json }}"
+        mode: "0644"
+      when: phase02_facts_changed | default(true)
