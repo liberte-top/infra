@@ -90,7 +90,7 @@
 - name: Ensure kubeconfig uses configured endpoint
   replace:
     path: /etc/rancher/k3s/k3s.yaml
-    regexp: '(^[[:space:]]*server: ).*$'
+    regexp: '^(\s*server:\s+).*$'
     replace: '\1{{ phase03_kubeconfig_server }}'
 
 - name: Check k3s node status

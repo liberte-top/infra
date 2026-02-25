@@ -1,0 +1,134 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase03 state dir
+  file:
+    path: /var/lib/infra/phase/03
+    state: directory
+    mode: "0755"
+
+- name: Stat phase03 facts file
+  stat:
+    path: /var/lib/infra/phase/03/facts.json
+  register: phase03_facts_stat
+
+- name: Read phase03 facts file
+  slurp:
+    src: /var/lib/infra/phase/03/facts.json
+  register: phase03_facts_raw
+  when: phase03_facts_stat.stat.exists
+
+- name: Parse phase03 facts
+  when: phase03_facts_raw is defined and phase03_facts_raw.content is defined
+  set_fact:
+    phase03_facts: "{{ phase03_facts_raw.content | b64decode | from_json }}"
+
+- name: Capture phase03 previous facts
+  when: phase03_facts is defined
+  set_fact:
+    phase03_facts_prev: "{{ phase03_facts }}"
+
+- name: Normalize phase03 kubeconfig endpoint
+  set_fact:
+    phase03_kubeconfig_server: "https://{{ k3s_api_endpoint | default(ansible_host) }}:6443"
+
+- name: Resolve phase03 expected k3s version for gate checks
+  when: phase03_facts is defined
+  set_fact:
+    phase03_k3s_version_expected: >-
+      {{
+        (phase03_facts.k3s.version | default(k3s_version_lock))
+        if (k3s_version_lock in ['stable', 'latest'])
+        else k3s_version_lock
+      }}
+
+- name: Check k3s service status
+  command: systemctl is-active k3s
+  register: phase03_k3s_service
+  changed_when: false
+  failed_when: false
+  when: phase03_facts is defined
+
+- name: Check k3s version
+  command: /usr/local/bin/k3s --version
+  register: phase03_k3s_version_check
+  changed_when: false
+  failed_when: false
+  when: phase03_facts is defined
+
+- name: Check k3s node status
+  command: /usr/local/bin/kubectl get nodes --request-timeout=5s
+  register: phase03_k3s_nodes_check
+  changed_when: false
+  failed_when: false
+  when: phase03_facts is defined
+
+- name: Check kubeconfig permissions
+  stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: phase03_kubeconfig_stat
+  when: phase03_facts is defined
+
+- name: Read kubeconfig server endpoint
+  shell: |
+    set -euo pipefail
+    awk '/^[[:space:]]*server: / { print $2; exit }' /etc/rancher/k3s/k3s.yaml
+  args:
+    executable: /bin/bash
+  register: phase03_kubeconfig_server_raw
+  changed_when: false
+  failed_when: false
+  when: phase03_facts is defined
+
+- name: Compute phase03 state match
+  when: phase03_facts is defined
+  set_fact:
+    phase03_facts_matches: >-
+      {{
+        (phase03_facts.phase | default('')) == '03' and
+        (phase03_facts.k3s.version | default('')) == phase03_k3s_version_expected and
+        (phase03_facts.k3s.cni | default('')) == 'flannel' and
+        (phase03_facts.k3s.addons | default('')) == 'default' and
+        (phase03_facts.k3s.api_access | default('')) == 'ssh-kubeconfig' and
+        (phase03_facts.k3s.etcd_snapshot_retention | default(1) | int) == (k3s_etcd_snapshot_retention | default(1) | int) and
+        (phase03_facts.kubeconfig.server | default('')) == phase03_kubeconfig_server
+      }}
+
+- name: Compute phase03 k3s readiness
+  when: phase03_facts is defined
+  set_fact:
+    phase03_k3s_ok: >-
+      {{
+        (phase03_k3s_service.stdout | default('')) == 'active' and
+        (phase03_k3s_version_expected in (phase03_k3s_version_check.stdout | default(''))) and
+        (phase03_k3s_nodes_check.rc | default(1)) == 0
+      }}
+    phase03_kubeconfig_ok: >-
+      {{
+        phase03_kubeconfig_stat is defined and
+        phase03_kubeconfig_stat.stat is defined and
+        (phase03_kubeconfig_stat.stat.exists | default(false)) and
+        (phase03_kubeconfig_stat.stat.pw_name | default('')) == 'root' and
+        (phase03_kubeconfig_stat.stat.gr_name | default('')) == 'root' and
+        (phase03_kubeconfig_stat.stat.mode | default('')) == '0600' and
+        (phase03_kubeconfig_server_raw.stdout | default('')) == phase03_kubeconfig_server
+      }}
+
+- name: Compute phase03 ready flag
+  when: phase03_facts is defined
+  set_fact:
+    phase03_ready: "{{ phase03_facts_matches and phase03_k3s_ok and phase03_kubeconfig_ok }}"
+
+- name: Compute phase03 skip flag
+  when: phase03_facts is defined
+  set_fact:
+    phase03_skip: "{{ phase03_ready }}"
+
+- name: Skip phase03 rollup when already ready
+  debug:
+    msg: "phase03 already converged; skip apply path"
+  when: phase03_skip | default(false)

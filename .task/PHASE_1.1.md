@@ -31,9 +31,16 @@
 - [2026-02-25T09:59:42Z] @ZQXY123deMacBook-Pro.local: Re-validated with updated local `.env`; kubectl wrapper executes successfully and node listing is healthy.
 - [2026-02-25T10:10:01Z] @ZQXY123deMacBook-Pro.local: Split phase05/phase06 responsibilities: phase05 helm-only, phase06 cert-manager lifecycle; status/rollup validation passed with phase target 06.
 - [2026-02-25T10:46:57Z] @ZQXY123deMacBook-Pro.local: Saved WIP handoff commit `a3d4339` after phase split and full 00->06 regression.
+- [2026-02-25T10:55:49Z] @ZQXY123deMacBook-Pro.local: Renamed rollup layering files in phase03/05/06 to `rollup.check.yml` + `rollup.apply.yml`; kept `rollup.yml` as stable orchestration entrypoint.
+- [2026-02-25T10:55:49Z] @ZQXY123deMacBook-Pro.local: Validation passed via `ansible-playbook --syntax-check` on `playbooks/status.yml` with `phase_target=06`.
+- [2026-02-25T11:00:28Z] @ZQXY123deMacBook-Pro.local: Runtime status validation passed (`status phase_target=06` => phase00..06 all `cur-success`).
+- [2026-02-25T11:00:28Z] @ZQXY123deMacBook-Pro.local: Runtime double-rollup regression passed (`rollup 00->06` x2, both `changed=0`, no failures) after rollup file naming refactor.
+- [2026-02-25T11:07:46Z] @ZQXY123deMacBook-Pro.local: Fixed phase03 gate false-negative causes: literal k3s version matching (`+k3s`), etcd retention type coercion (`int`), and kubeconfig endpoint `replace` regex (POSIX -> Python regex).
+- [2026-02-25T11:07:46Z] @ZQXY123deMacBook-Pro.local: Validation passed: `rollup 03->03` first pass reconciled kubeconfig endpoint (`changed=1`), second pass short-circuited and skipped apply path.
+- [2026-02-25T11:07:46Z] @ZQXY123deMacBook-Pro.local: Validation passed: full `rollup 00->06` with phase03 converged skip behavior and overall `changed=0`.
 
 ## Technical Notes
-- **Files Touched:** .task/*, scripts/kubectl.sh, .env.example, AGENTS.md, playbooks/{rollup,rollback,status}.yml, playbooks/phases/phase_06.yml, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup_apply}.yml, roles/phase05/tasks/{rollup,rollup_apply,status,rollback}.yml, roles/phase06/tasks/{rollup,rollup_apply,status,rollback}.yml, inventory/group_vars/all.yml
+- **Files Touched:** .task/*, scripts/kubectl.sh, .env.example, AGENTS.md, playbooks/{rollup,rollback,status}.yml, playbooks/phases/phase_06.yml, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup.check,rollup.apply}.yml, roles/phase05/tasks/{rollup,rollup.check,rollup.apply,status,rollback}.yml, roles/phase06/tasks/{rollup,rollup.check,rollup.apply,status,rollback}.yml, inventory/group_vars/all.yml
 - **New Dependencies:** 无
 - **Blockers:** 无
 

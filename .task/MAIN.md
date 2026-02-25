@@ -2,8 +2,8 @@
 
 - **Branch:** feat/add-kubeconfig-smoke-check
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T10:46:57Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** WIP checkpoint saved after phase05/06 split and 00->06 validation; next session can continue directly from phase06-centric model.
+- **Last-Sync:** 2026-02-25T11:07:46Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** phase03 rollup gate optimized to actually short-circuit after convergence; verified via targeted and full rollup runs.
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -36,6 +36,13 @@
 - [2026-02-25T10:10:01Z] UPDATE: Refactored phase model: extracted cert-manager lifecycle from phase05 into new phase06; phase05 now owns helm binary lifecycle only.
 - [2026-02-25T10:10:01Z] UPDATE: Validation passed: `status phase_target=06` all `cur-success`; first `rollup 00->06` converged; second `rollup 00->06` idempotency pass returned `changed=0`.
 - [2026-02-25T10:46:57Z] UPDATE: Created WIP commit `a3d4339` (`WIP: split phase05 helm-only and add phase06 cert-manager`) for session handoff.
+- [2026-02-25T10:55:49Z] UPDATE: Renamed phase03/05/06 rollup layering files to `rollup.check.yml` + `rollup.apply.yml` and kept `rollup.yml` as orchestration entrypoint.
+- [2026-02-25T10:55:49Z] UPDATE: Validation passed: `./scripts/ansible.sh ansible-playbook playbooks/status.yml --syntax-check -e phase_target=06`.
+- [2026-02-25T11:00:28Z] UPDATE: Runtime validation passed: `status phase_target=06` reported all phases `cur-success`.
+- [2026-02-25T11:00:28Z] UPDATE: Double regression passed: both `rollup 00->06` runs succeeded with `changed=0` and no failures after naming refactor.
+- [2026-02-25T11:07:46Z] UPDATE: Optimized phase03 gate checks: fixed version matching for literal `+k3s` strings, normalized etcd retention comparison to int, and corrected kubeconfig `replace` regex to Python-compatible pattern.
+- [2026-02-25T11:07:46Z] UPDATE: Validation passed: `rollup 03->03` first run reconciled kubeconfig endpoint (`changed=1`), second run short-circuited with `phase03 already converged; skip apply path`.
+- [2026-02-25T11:07:46Z] UPDATE: Full regression passed: `rollup 00->06` succeeded with `changed=0`, and phase03 apply path remained skipped when converged.
 
 ## Global References
 - **Docs:** .task/MAIN.md
