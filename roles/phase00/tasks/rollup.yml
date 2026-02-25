@@ -18,6 +18,7 @@
       - curl
       - jq
       - ufw
+      - tailscale
       - gnupg
       - lsb-release
       - apt-transport-https
@@ -90,6 +91,13 @@
   register: phase00_apt_update
   changed_when: false
 
+- name: Install tailscale package repository
+  shell: curl -fsSL https://tailscale.com/install.sh | sh
+  args:
+    executable: /bin/bash
+  register: phase00_tailscale_repo
+  changed_when: false
+
 - name: Install baseline packages
   apt:
     name:
@@ -97,6 +105,7 @@
       - curl
       - jq
       - ufw
+      - tailscale
       - gnupg
       - lsb-release
       - apt-transport-https
@@ -121,6 +130,7 @@
           - curl
           - jq
           - ufw
+          - tailscale
           - gnupg
           - lsb-release
           - apt-transport-https

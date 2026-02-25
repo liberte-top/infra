@@ -2,11 +2,13 @@
 
 - **Branch:** feat/simplify-infra-layer
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T05:24:22Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** 会话交接已准备完毕；下一会话从 phase02 依赖修复（community.general）继续推进。
+- **Last-Sync:** 2026-02-25T05:56:33Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** phase00 已完成 tailscale 基础纳入并通过幂等回归；下一步进入 phase01 root-only 重构，并统一 phase01-05 仅 facts.json 持久化策略。
 
 ## Phase Stack
 > Current execution depth (Top is active)
+  - 1.3: Root-Only + Tailscale Kubeconfig Refactor
+  - 1.2: Phase02 Dependency-Free Remediation
   - 1.1: Baseline Snapshot & Simplification Scope
 
 ## Timeline
@@ -27,6 +29,17 @@
 - [2026-02-25T05:16:34Z] UPDATE: Cleaned local redundant docker images via image prune and captured before/after disk usage.
 - [2026-02-25T05:18:13Z] UPDATE: Audited docker build cache state (builder du/verbose) and prepared selective prune strategy.
 - [2026-02-25T05:24:22Z] UPDATE: Prepared handoff context for next session; next focus is phase02 dependency fix and redeploy validation.
+- [2026-02-25T05:25:10Z] UPDATE: Confirmed remediation direction with user: remove phase02 `ufw` module dependency and use CLI commands.
+- [2026-02-25T05:25:11Z] PHASE PUSH: Begin Phase 1.2 (phase02 dependency-free remediation + validation).
+- [2026-02-25T05:31:24Z] UPDATE: Replaced phase02 rollup/rollback `ufw` module tasks with `ufw` CLI command tasks.
+- [2026-02-25T05:34:10Z] UPDATE: Ran phase02 rollback validation successfully after dependency-free refactor.
+- [2026-02-25T05:34:39Z] UPDATE: Verified status flow post-rollback (`phase=02 status=pre-ready`).
+- [2026-02-25T05:35:18Z] UPDATE: Added explicit `loop_var` for phase02 UFW loops and re-validated rollup without loop-collision warnings.
+- [2026-02-25T05:46:22Z] UPDATE: Confirmed new target with user: phase00 includes tailscale baseline; phase01+ uses root-only model and tailscale built-in-domain kubeconfig.
+- [2026-02-25T05:46:22Z] PHASE PUSH: Begin Phase 1.3 (phase00-05 refactor for root-only + tailscale kubeconfig standardization).
+- [2026-02-25T05:53:15Z] UPDATE: Completed phase00 refactor by adding tailscale baseline package path and passed status/rollup/idempotency/rollback/status regression chain.
+- [2026-02-25T05:53:15Z] UPDATE: Aligned implementation direction with user reminder: phase01-05 should persist only facts.json; status remains read-only validation.
+- [2026-02-25T05:56:33Z] UPDATE: Prepared session handoff checkpoint; next session starts from phase01 root-only + facts-only persistence refactor.
 
 ## Global References
 - **Docs:** .task/MAIN.md

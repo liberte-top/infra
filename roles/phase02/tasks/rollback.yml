@@ -5,8 +5,9 @@
   changed_when: true
 
 - name: Disable UFW
-  ufw:
-    state: disabled
+  command: ufw --force disable
+  register: phase02_ufw_disable
+  changed_when: true
 
 - name: Restore UFW IPv6 default
   lineinfile:

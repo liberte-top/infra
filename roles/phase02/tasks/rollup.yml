@@ -180,41 +180,45 @@
   changed_when: true
 
 - name: Set UFW default incoming policy
-  ufw:
-    direction: incoming
-    policy: deny
+  command: ufw default deny incoming
+  register: phase02_ufw_default_incoming
+  changed_when: true
 
 - name: Set UFW default outgoing policy
-  ufw:
-    direction: outgoing
-    policy: allow
+  command: ufw default allow outgoing
+  register: phase02_ufw_default_outgoing
+  changed_when: true
 
 - name: Set UFW default routed policy
-  ufw:
-    direction: routed
-    policy: allow
+  command: ufw default allow routed
+  register: phase02_ufw_default_routed
+  changed_when: true
 
 - name: Allow UFW ports
-  ufw:
-    rule: allow
-    port: "{{ item }}"
-    proto: tcp
+  command: "ufw allow {{ ufw_port }}/tcp"
+  register: phase02_ufw_allow_ports
+  changed_when: true
   loop: "{{ ufw_allow_ports | difference(ufw_limit_ports | default([])) }}"
+  loop_control:
+    loop_var: ufw_port
 
 - name: Rate limit UFW ports
-  ufw:
-    rule: limit
-    port: "{{ item }}"
-    proto: tcp
+  command: "ufw limit {{ ufw_port }}/tcp"
+  register: phase02_ufw_limit_ports
+  changed_when: true
   loop: "{{ ufw_limit_ports | default([]) }}"
+  loop_control:
+    loop_var: ufw_port
 
 - name: Configure UFW logging
-  ufw:
-    logging: "{{ ufw_logging }}"
+  command: "ufw logging {{ ufw_logging }}"
+  register: phase02_ufw_logging
+  changed_when: true
 
 - name: Enable UFW
-  ufw:
-    state: enabled
+  command: ufw --force enable
+  register: phase02_ufw_enable
+  changed_when: true
 
 - name: Install sysctl hardening config
   template:
