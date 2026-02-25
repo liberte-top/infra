@@ -24,6 +24,7 @@
 - [2026-02-25T08:49:55Z] @ZQXY123deMacBook-Pro.local: Verified target tailscale runtime is `NeedsLogin`; MagicDNS unavailable until node joins tailnet.
 - [2026-02-25T09:37:34Z] @ZQXY123deMacBook-Pro.local: User changed direction: remove tailscale logic and use plain SSH remote kubectl flow.
 - [2026-02-25T09:44:56Z] @ZQXY123deMacBook-Pro.local: Hard-cut migration completed (`k3s_api_endpoint` + `ssh-kubeconfig` semantics) and runtime validations passed.
+- [2026-02-25T09:51:50Z] @ZQXY123deMacBook-Pro.local: Saved handoff checkpoint via WIP commit `9297f34` for next session.
 
 ## Technical Notes
 - **Files Touched:** .task/*, scripts/kubectl.sh, AGENTS.md, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup_apply}.yml, inventory/group_vars/all.yml, playbooks/status.yml
