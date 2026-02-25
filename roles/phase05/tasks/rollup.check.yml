@@ -1,8 +1,4 @@
 ---
-- name: Compute precheck readiness
-  set_fact:
-    phase05_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
-
 - name: Ensure infra phase base dir
   file:
     path: /var/lib/infra/phase
@@ -29,7 +25,7 @@
 - name: Parse phase05 facts
   when: phase05_facts_raw is defined and phase05_facts_raw.content is defined
   set_fact:
-    phase05_facts: "{{ phase05_facts_raw.content | b64decode | from_json }}"
+    phase05_facts_prev: "{{ phase05_facts_raw.content | b64decode | from_json }}"
 
 - name: Normalize helm version
   set_fact:
@@ -37,6 +33,20 @@
       {{
         (helm_version_lock | regex_search('^v'))
         | ternary(helm_version_lock, 'v' ~ helm_version_lock)
+      }}
+
+- name: Detect system architecture
+  command: uname -m
+  register: phase05_uname
+  changed_when: false
+
+- name: Map helm architecture
+  set_fact:
+    phase05_helm_arch: >-
+      {{
+        'amd64' if (phase05_uname.stdout | default('')) in ['x86_64', 'amd64'] else
+        'arm64' if (phase05_uname.stdout | default('')) in ['aarch64', 'arm64'] else
+        (phase05_uname.stdout | default('amd64'))
       }}
 
 - name: Check helm binary
@@ -65,23 +75,28 @@
       {{
         (phase05_helm_version_ok | default(false))
       }}
+  when: phase05_facts_prev is defined
 
-- name: Compute phase05 status value
+- name: Compute phase05 state match
   set_fact:
-    phase05_status_value: >-
+    phase05_state_matches: >-
       {{
-        'pre-not-ready' if not phase05_pre_ready
-        else
-        (
-          'cur-success' if phase05_ready
-          else
-          (
-            'cur-failed' if phase05_facts is defined
-            else 'pre-ready'
-          )
-        )
+        (phase05_facts_prev.phase | default('')) == '05' and
+        (phase05_facts_prev.helm.version | default('')) == phase05_helm_version and
+        (phase05_facts_prev.helm.path | default('')) == '/usr/local/bin/helm'
+      }}
+  when: phase05_facts_prev is defined
+
+- name: Compute phase05 skip flag
+  set_fact:
+    phase05_skip: >-
+      {{
+        (phase05_facts_prev is defined) and
+        (phase05_state_matches | default(false)) and
+        (phase05_ready | default(false))
       }}
 
-- name: Set phase05 status
-  set_fact:
-    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase05_status_value }) }}"
+- name: Skip phase05 rollup when already ready
+  debug:
+    msg: "phase05 already converged; skip apply path"
+  when: phase05_skip | default(false)

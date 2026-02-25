@@ -27,16 +27,15 @@ infra/
 │   ├── rollup.yml
 │   ├── rollback.yml
 │   ├── status.yml
-│   └── phases/phase_00.yml..phase_05.yml  # Per-phase role dispatch
+│   └── phases/phase_00.yml..phase_06.yml  # Per-phase role dispatch
 ├── roles/                    # Desired state implementation by phase
-│   ├── phase00..phase05/
+│   ├── phase00..phase06/
 │   │   ├── tasks/{rollup,rollback,status}.yml
 │   │   └── templates/        # Present in phase02/phase04
 ├── scripts/                  # Operational entrypoints and local tooling
 │   ├── ansible.sh            # Single ansible runtime wrapper (containerized)
 │   ├── ssh.sh                # Direct SSH connectivity helper
 │   ├── utils.sh              # Shared shell helpers for scripts
-│   └── ci.sh                 # GitHub Actions workflow trigger helper
 ├── ansible.cfg               # Local ansible defaults
 ├── .env(.example)            # Runtime parameters
 ├── BOOTSTRAP.md              # Phase -1 manual server bootstrap
@@ -47,9 +46,10 @@ infra/
 - `phase00`: base OS packages and phase state bootstrap.
 - `phase01`: root-only SSH hardening baseline.
 - `phase02`: UFW + sysctl hardening.
-- `phase03`: k3s install/verify + tailscale kubeconfig endpoint standardization.
+- `phase03`: k3s install/verify + kubeconfig endpoint standardization.
 - `phase04`: maintenance timers (image GC, logrotate, release prune).
-- `phase05`: helm + cert-manager lifecycle.
+- `phase05`: helm binary lifecycle.
+- `phase06`: cert-manager lifecycle.
 
 ## Phase Runtime Files
 - Persist phase facts in `/var/lib/infra/phase/<id>/facts.json`.
@@ -60,10 +60,12 @@ infra/
 - `INFRA_SSH_HOST`: target host/IP for ansible inventory host.
 - `INFRA_SSH_USER`: SSH user for target host.
 - `INFRA_SSH_PRIVATE_KEY_B64` (required): base64-encoded private key, decoded at runtime.
+- `INFRA_KUBECONFIG_PATH` (required by `scripts/kubectl.sh`): remote kubeconfig path copied to a temp file for each kubectl invocation.
+- `INFRA_KUBECTL_TUNNEL_LOCAL_PORT` (optional by `scripts/kubectl.sh`, default `56443`): local loopback port used for SSH tunnel to remote apiserver `127.0.0.1:6443`.
 
 ## Core Inventory Variables
 - `root_pubkey`: SSH key allowed for `root`.
-- `k3s_tailscale_fqdn`: tailscale/MagicDNS endpoint used in k3s kubeconfig server URL (default `ansible_host`).
+- `k3s_api_endpoint`: endpoint used in k3s kubeconfig server URL (default `ansible_host`).
 
 ## Execution Entry
 - Always run ansible through `scripts/ansible.sh`.
@@ -74,9 +76,16 @@ infra/
 ## Common Commands
 - `./scripts/ssh.sh`
 - `./scripts/ssh.sh uname -a`
-- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=03`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/kubectl.sh`
+- `./scripts/kubectl.sh get nodes -o wide`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=06`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=06`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=06`
+
+## Kubectl Tunnel Workflow
+- `scripts/kubectl.sh` is strict tunnel mode only.
+- Each invocation copies remote kubeconfig from `INFRA_KUBECONFIG_PATH` to a temporary local file, opens SSH local-forward `127.0.0.1:${INFRA_KUBECTL_TUNNEL_LOCAL_PORT:-56443} -> 127.0.0.1:6443`, then executes local kubectl via `--server` + `--kubeconfig`.
+- Tunnel and temp files are cleaned up automatically after command exit.
 
 ## Phase00 Regression Checklist
 - `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`

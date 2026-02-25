@@ -1,0 +1,82 @@
+---
+- name: Set phase06 kubeconfig path
+  set_fact:
+    phase06_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Install cert-manager via helm
+  command: >-
+    /usr/local/bin/helm upgrade --install "{{ cert_manager_release }}"
+    "{{ cert_manager_chart }}"
+    --version "{{ cert_manager_version_lock }}"
+    --namespace "{{ cert_manager_namespace }}"
+    --create-namespace
+    --set crds.enabled=true
+    --wait
+    --timeout 300s
+  environment:
+    KUBECONFIG: "{{ phase06_kubeconfig }}"
+
+- name: Wait for cert-manager deployments
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase06_deploy }} --timeout=180s
+  register: phase06_cm_rollout_apply
+  changed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+  loop_control:
+    loop_var: phase06_deploy
+  environment:
+    KUBECONFIG: "{{ phase06_kubeconfig }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase06_now
+  changed_when: false
+
+- name: Build phase06 facts
+  set_fact:
+    phase06_facts:
+      phase: "06"
+      ok: true
+      timestamp: "{{ phase06_now.stdout }}"
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+
+- name: Build phase06 facts compare
+  set_fact:
+    phase06_facts_compact:
+      phase: "06"
+      ok: true
+      cert_manager:
+        release: "{{ cert_manager_release }}"
+        namespace: "{{ cert_manager_namespace }}"
+        chart: "{{ cert_manager_chart }}"
+        version: "{{ cert_manager_version_lock }}"
+        crds_enabled: true
+    phase06_facts_prev_compact: >-
+      {{
+        (phase06_facts_prev | default({}))
+        | dict2items
+        | rejectattr('key', 'equalto', 'timestamp')
+        | items2dict
+      }}
+
+- name: Check phase06 facts change
+  set_fact:
+    phase06_facts_changed: >-
+      {{
+        (phase06_facts_prev is not defined) or
+        (phase06_facts_prev_compact != phase06_facts_compact)
+      }}
+
+- name: Write phase06 facts file
+  copy:
+    dest: /var/lib/infra/phase/06/facts.json
+    content: "{{ phase06_facts | to_nice_json }}"
+    mode: "0644"
+  when: phase06_facts_changed | default(true)

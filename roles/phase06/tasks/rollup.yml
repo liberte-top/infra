@@ -1,0 +1,7 @@
+---
+- name: Evaluate phase06 rollup gate
+  include_tasks: rollup.check.yml
+
+- name: Apply phase06 converging tasks
+  include_tasks: rollup.apply.yml
+  when: not (phase06_skip | default(false))

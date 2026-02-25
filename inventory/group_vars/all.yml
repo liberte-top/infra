@@ -9,7 +9,7 @@ ssh_allow_users:
 
 k3s_version_lock: "v1.34.3+k3s1"
 k3s_etcd_snapshot_retention: 1
-k3s_tailscale_fqdn: "{{ ansible_host }}"
+k3s_api_endpoint: "{{ ansible_host }}"
 
 ufw_allow_ports:
   - 22

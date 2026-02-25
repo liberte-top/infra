@@ -1,0 +1,114 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase06 facts dir
+  file:
+    path: /var/lib/infra/phase/06
+    state: directory
+    mode: "0755"
+
+- name: Stat phase06 facts file
+  stat:
+    path: /var/lib/infra/phase/06/facts.json
+  register: phase06_facts_stat
+
+- name: Read phase06 facts file
+  slurp:
+    src: /var/lib/infra/phase/06/facts.json
+  register: phase06_facts_raw
+  when: phase06_facts_stat.stat.exists
+
+- name: Parse phase06 facts
+  when: phase06_facts_raw is defined and phase06_facts_raw.content is defined
+  set_fact:
+    phase06_facts_prev: "{{ phase06_facts_raw.content | b64decode | from_json }}"
+
+- name: Set phase06 kubeconfig path
+  set_fact:
+    phase06_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Check helm binary
+  stat:
+    path: /usr/local/bin/helm
+  register: phase06_helm_bin
+
+- name: Check helm release status
+  command: /usr/local/bin/helm status "{{ cert_manager_release }}" -n "{{ cert_manager_namespace }}"
+  register: phase06_helm_status
+  changed_when: false
+  failed_when: false
+  when: phase06_facts_prev is defined and phase06_helm_bin.stat.exists
+  environment:
+    KUBECONFIG: "{{ phase06_kubeconfig }}"
+
+- name: Check cert-manager deployments
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase06_deploy }} --timeout=30s
+  register: phase06_cm_rollout
+  changed_when: false
+  failed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+  loop_control:
+    loop_var: phase06_deploy
+  when: phase06_facts_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase06_kubeconfig }}"
+
+- name: Check cert-manager CRD
+  command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
+  register: phase06_cm_crd
+  changed_when: false
+  failed_when: false
+  when: phase06_facts_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase06_kubeconfig }}"
+
+- name: Compute phase06 readiness
+  set_fact:
+    phase06_ready: >-
+      {{
+        (phase06_helm_status is defined and (phase06_helm_status.rc | default(1)) == 0) and
+        (
+          (phase06_helm_status.stdout | default('')) is search('STATUS: deployed') or
+          (phase06_helm_status.stdout | default('')) is search('status: deployed')
+        ) and
+        (phase06_cm_crd is defined and (phase06_cm_crd.rc | default(1)) == 0) and
+        (
+          phase06_cm_rollout is defined and
+          (phase06_cm_rollout.results | map(attribute='rc') | list | max | default(1)) == 0
+        )
+      }}
+  when: phase06_facts_prev is defined
+
+- name: Compute phase06 state match
+  set_fact:
+    phase06_state_matches: >-
+      {{
+        (phase06_facts_prev.phase | default('')) == '06' and
+        (phase06_facts_prev.cert_manager.release | default('')) == cert_manager_release and
+        (phase06_facts_prev.cert_manager.namespace | default('')) == cert_manager_namespace and
+        (phase06_facts_prev.cert_manager.chart | default('')) == cert_manager_chart and
+        (phase06_facts_prev.cert_manager.version | default('')) == cert_manager_version_lock and
+        (phase06_facts_prev.cert_manager.crds_enabled | default(false)) == true
+      }}
+  when: phase06_facts_prev is defined
+
+- name: Compute phase06 skip flag
+  set_fact:
+    phase06_skip: >-
+      {{
+        (phase06_facts_prev is defined) and
+        (phase06_state_matches | default(false)) and
+        (phase06_ready | default(false))
+      }}
+
+- name: Skip phase06 rollup when already ready
+  debug:
+    msg: "phase06 already converged; skip apply path"
+  when: phase06_skip | default(false)
