@@ -30,6 +30,7 @@
 - [2026-02-25T09:58:56Z] @ZQXY123deMacBook-Pro.local: Tightened kubectl env contract: `INFRA_KUBECTL_BIN` and `INFRA_KUBECONFIG_PATH` are now required; defaults added in `.env.example`.
 - [2026-02-25T09:59:42Z] @ZQXY123deMacBook-Pro.local: Re-validated with updated local `.env`; kubectl wrapper executes successfully and node listing is healthy.
 - [2026-02-25T10:10:01Z] @ZQXY123deMacBook-Pro.local: Split phase05/phase06 responsibilities: phase05 helm-only, phase06 cert-manager lifecycle; status/rollup validation passed with phase target 06.
+- [2026-02-25T10:46:57Z] @ZQXY123deMacBook-Pro.local: Saved WIP handoff commit `a3d4339` after phase split and full 00->06 regression.
 
 ## Technical Notes
 - **Files Touched:** .task/*, scripts/kubectl.sh, .env.example, AGENTS.md, playbooks/{rollup,rollback,status}.yml, playbooks/phases/phase_06.yml, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup_apply}.yml, roles/phase05/tasks/{rollup,rollup_apply,status,rollback}.yml, roles/phase06/tasks/{rollup,rollup_apply,status,rollback}.yml, inventory/group_vars/all.yml

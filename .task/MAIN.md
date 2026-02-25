@@ -2,8 +2,8 @@
 
 - **Branch:** feat/add-kubeconfig-smoke-check
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T10:10:01Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** Phase split completed: phase05 now helm-only, phase06 manages cert-manager; full `00->06` rollup converges and idempotency passes.
+- **Last-Sync:** 2026-02-25T10:46:57Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** WIP checkpoint saved after phase05/06 split and 00->06 validation; next session can continue directly from phase06-centric model.
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -35,6 +35,7 @@
 - [2026-02-25T09:59:42Z] UPDATE: Re-validation after user `.env` update passed; both kubectl env vars are present and `./scripts/kubectl.sh` returns healthy node list.
 - [2026-02-25T10:10:01Z] UPDATE: Refactored phase model: extracted cert-manager lifecycle from phase05 into new phase06; phase05 now owns helm binary lifecycle only.
 - [2026-02-25T10:10:01Z] UPDATE: Validation passed: `status phase_target=06` all `cur-success`; first `rollup 00->06` converged; second `rollup 00->06` idempotency pass returned `changed=0`.
+- [2026-02-25T10:46:57Z] UPDATE: Created WIP commit `a3d4339` (`WIP: split phase05 helm-only and add phase06 cert-manager`) for session handoff.
 
 ## Global References
 - **Docs:** .task/MAIN.md
