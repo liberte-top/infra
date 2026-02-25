@@ -64,23 +64,22 @@ infra/
 ## Execution Entry
 - Always run ansible through `scripts/ansible.sh`.
 - Behavior:
-  - No arguments: open interactive shell inside the ansible image.
-  - Any `*.yml`/`*.yaml` argument: execute via `ansible-playbook`.
-  - Otherwise: execute via `ansible`.
+  - No arguments: execute `ansible --version`.
+  - With arguments: pass through directly to the container command.
 
 ## Common Commands
 - `./scripts/ssh.sh`
 - `./scripts/ssh.sh uname -a`
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=03`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
-- `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
 
 ## Phase00 Regression Checklist
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
-- `./scripts/ansible.sh playbooks/rollup.yml -e phase_from=00 -e phase_to=00` (idempotency pass)
-- `./scripts/ansible.sh playbooks/rollback.yml -e phase_from=00 -e phase_to=00`
-- `./scripts/ansible.sh playbooks/status.yml -e phase_target=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=00` (idempotency pass)
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=00`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`
 
 ## Change Policy
 - Update ansible image version in `.env` (or `.env.example` default), not in playbooks.

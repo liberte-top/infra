@@ -27,6 +27,11 @@ require_env() {
   [[ -n "${!name:-}" ]] || error "${name} is required in ${scope}"
 }
 
+require_command() {
+  local cmd="$1"
+  command -v "${cmd}" >/dev/null 2>&1 || error "Missing required command: ${cmd}"
+}
+
 load_env_file() {
   local file_path="${1:-./.env}"
   require_file "${file_path}" "Create it from ./.env.example."
@@ -46,4 +51,38 @@ generate_base64_file() {
   local b64_payload="$2"
   umask 077
   printf '%s' "${b64_payload}" | base64 -d > "${file_path}"
+}
+
+generate_tmp_ssh_key_file() {
+  local b64_payload="$1"
+  generate_tmpdir
+  local temp_dir="${GENERATED_TMPDIR}"
+  local ssh_key_file="${temp_dir}/infra_ssh_key"
+  generate_base64_file "${ssh_key_file}" "${b64_payload}"
+  GENERATED_SSH_KEY_FILE="${ssh_key_file}"
+}
+
+# Normalize command args with explicit defaults.
+# Usage:
+#   normalize_args <default_arg...> -- <provided_arg...>
+# Output:
+#   NORMALIZED_ARGS global array
+normalize_args() {
+  local -a defaults=()
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--" ]]; then
+      shift
+      break
+    fi
+    defaults+=("$1")
+    shift
+  done
+
+  local -a provided=("$@")
+  if [[ ${#provided[@]} -eq 0 ]]; then
+    NORMALIZED_ARGS=("${defaults[@]}")
+    return 0
+  fi
+
+  NORMALIZED_ARGS=("${provided[@]}")
 }
