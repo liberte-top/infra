@@ -82,6 +82,11 @@ infra/
 - `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=06`
 - `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=06`
 
+## Kubectl Tunnel Workflow
+- `scripts/kubectl.sh` is strict tunnel mode only.
+- Each invocation copies remote kubeconfig from `INFRA_KUBECONFIG_PATH` to a temporary local file, opens SSH local-forward `127.0.0.1:${INFRA_KUBECTL_TUNNEL_LOCAL_PORT:-56443} -> 127.0.0.1:6443`, then executes local kubectl via `--server` + `--kubeconfig`.
+- Tunnel and temp files are cleaned up automatically after command exit.
+
 ## Phase00 Regression Checklist
 - `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`
 - `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=00`
