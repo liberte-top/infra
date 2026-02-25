@@ -1,6 +1,7 @@
 name: ci.guard-main-taskdir
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
