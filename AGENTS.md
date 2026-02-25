@@ -89,3 +89,8 @@ infra/
 - Update ansible image version in `.env` (or `.env.example` default), not in playbooks.
 - Keep `scripts/ansible.sh` as the single operational entrypoint.
 - If multi-container orchestration is required in the future, add a dedicated compose file intentionally; do not reintroduce hidden dual entrypoints.
+
+## Main Branch Guard
+- `.task/` is allowed during feature work but must not exist on `main`.
+- Promote useful task insights to permanent docs (for example `AGENTS.md`/`BOOTSTRAP.md`) before merge.
+- `main` is protected by required check `forbid-task-dir-on-main` from workflow `.github/workflows/ci.guard.yml`.
