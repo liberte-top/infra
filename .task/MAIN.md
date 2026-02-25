@@ -2,8 +2,8 @@
 
 - **Branch:** feat/add-kubeconfig-smoke-check
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T11:07:46Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** phase03 rollup gate optimized to actually short-circuit after convergence; verified via targeted and full rollup runs.
+- **Last-Sync:** 2026-02-25T11:09:16Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** WIP handoff checkpoint committed after rollup naming refactor and phase03 short-circuit fixes; next session can continue from commit `c3f0eea`.
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -43,6 +43,7 @@
 - [2026-02-25T11:07:46Z] UPDATE: Optimized phase03 gate checks: fixed version matching for literal `+k3s` strings, normalized etcd retention comparison to int, and corrected kubeconfig `replace` regex to Python-compatible pattern.
 - [2026-02-25T11:07:46Z] UPDATE: Validation passed: `rollup 03->03` first run reconciled kubeconfig endpoint (`changed=1`), second run short-circuited with `phase03 already converged; skip apply path`.
 - [2026-02-25T11:07:46Z] UPDATE: Full regression passed: `rollup 00->06` succeeded with `changed=0`, and phase03 apply path remained skipped when converged.
+- [2026-02-25T11:09:16Z] UPDATE: Created WIP commit `c3f0eea` (`WIP: rename rollup check/apply layering and optimize phase03 gate`) for next-session continuation.
 
 ## Global References
 - **Docs:** .task/MAIN.md
