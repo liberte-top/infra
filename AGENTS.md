@@ -60,8 +60,8 @@ infra/
 - `INFRA_SSH_HOST`: target host/IP for ansible inventory host.
 - `INFRA_SSH_USER`: SSH user for target host.
 - `INFRA_SSH_PRIVATE_KEY_B64` (required): base64-encoded private key, decoded at runtime.
-- `INFRA_KUBECTL_BIN` (required by `scripts/kubectl.sh`): remote kubectl binary path.
-- `INFRA_KUBECONFIG_PATH` (required by `scripts/kubectl.sh`): remote kubeconfig path passed via `KUBECONFIG`.
+- `INFRA_KUBECONFIG_PATH` (required by `scripts/kubectl.sh`): remote kubeconfig path copied to a temp file for each kubectl invocation.
+- `INFRA_KUBECTL_TUNNEL_LOCAL_PORT` (optional by `scripts/kubectl.sh`, default `56443`): local loopback port used for SSH tunnel to remote apiserver `127.0.0.1:6443`.
 
 ## Core Inventory Variables
 - `root_pubkey`: SSH key allowed for `root`.
