@@ -2,8 +2,8 @@
 
 - **Branch:** feat/add-kubeconfig-smoke-check
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T08:45:57Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** WIP checkpoint prepared for next session; pending decision is strict-fail vs auto-reconcile for kubeconfig tailscale endpoint mismatch.
+- **Last-Sync:** 2026-02-25T09:50:18Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** Full 00-05 regression completed after tailscale hard-cut; status and double rollup idempotency both pass.
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -19,6 +19,12 @@
 - [2026-02-25T08:40:54Z] UPDATE: Updated kubectl.sh to enforce tailscale kubeconfig server endpoint before execution.
 - [2026-02-25T08:40:54Z] UPDATE: Validation now fails by design: expected `https://43.251.225.184:6443`, actual is `https://127.0.0.1:6443`.
 - [2026-02-25T08:45:57Z] UPDATE: Session handoff checkpoint: `scripts/kubectl.sh` implemented and blocking correctly on endpoint mismatch; next step is to confirm remediation strategy with user.
+- [2026-02-25T08:48:21Z] UPDATE: User confirmed endpoint policy: strict tailscale internal domain/MagicDNS only; no auto-reconcile fallback.
+- [2026-02-25T08:49:55Z] UPDATE: Runtime check shows target tailscale state is `NeedsLogin` with empty `DNSName`/`MagicDNSSuffix`; must establish tailnet/MagicDNS before kubeconfig endpoint can be validated.
+- [2026-02-25T09:37:34Z] UPDATE: User changed strategy to remove tailscale logic and return to plain SSH + remote kubectl path.
+- [2026-02-25T09:44:56Z] UPDATE: Completed hard-cut cleanup in phase00/03, inventory/status vars, kubectl.sh, and AGENTS docs (`k3s_tailscale_fqdn` -> `k3s_api_endpoint`, `tailscale-kubeconfig` -> `ssh-kubeconfig`).
+- [2026-02-25T09:44:56Z] UPDATE: Validated runtime: `./scripts/kubectl.sh` succeeds; `status phase_target=03` succeeds; `rollup 00->03` succeeds and idempotency pass returns `changed=0`.
+- [2026-02-25T09:50:18Z] UPDATE: Full regression passed: `status phase_target=05` all `cur-success`; `rollup 00->05` succeeded; second `rollup 00->05` idempotency pass returned `changed=0`.
 
 ## Global References
 - **Docs:** .task/MAIN.md

@@ -67,7 +67,7 @@
     set -o pipefail
     timeout 900s sh -c 'curl -sfL https://get.k3s.io | \
       INSTALL_K3S_VERSION="{{ phase03_k3s_version_resolved }}" \
-      INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --tls-san={{ k3s_tailscale_fqdn | default(ansible_host) }} --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}" \
+      INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --tls-san={{ k3s_api_endpoint | default(ansible_host) }} --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}" \
       sh -'
   args:
     executable: /bin/bash
@@ -87,7 +87,7 @@
     group: root
     mode: "0600"
 
-- name: Ensure kubeconfig uses tailscale endpoint
+- name: Ensure kubeconfig uses configured endpoint
   replace:
     path: /etc/rancher/k3s/k3s.yaml
     regexp: '(^[[:space:]]*server: ).*$'
@@ -116,7 +116,7 @@
       k3s:
         version: "{{ phase03_k3s_version_resolved | default('unknown') }}"
         installed_version: "{{ phase03_k3s_installed_version | default('unknown') }}"
-        api_access: "tailscale-kubeconfig"
+        api_access: "ssh-kubeconfig"
         addons: "default"
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
@@ -134,7 +134,7 @@
       k3s:
         version: "{{ phase03_k3s_version_resolved | default('unknown') }}"
         installed_version: "{{ phase03_k3s_installed_version | default('unknown') }}"
-        api_access: "tailscale-kubeconfig"
+        api_access: "ssh-kubeconfig"
         addons: "default"
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
