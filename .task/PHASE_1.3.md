@@ -39,6 +39,13 @@
 - [2026-02-25T06:47:38Z] COMPLETED: Live regression passed (`status 05 -> rollup 03-05 -> rollup 03-05 -> status 05`) with final `00..05=cur-success`.
 - [2026-02-25T06:47:38Z] COMPLETED: Verified rollup idempotency convergence at steady state (`changed=0`) and cleared loop-var collision warnings.
 - [2026-02-25T06:51:06Z] COMPLETED: Phase 1.3 deliverables finalized and synchronized before single-commit consolidation.
+- [2026-02-25T06:51:55Z] COMPLETED: Consolidated implementation into single commit `04443e6`.
+- [2026-02-25T07:03:42Z] COMPLETED: Re-ran full regression chain and confirmed second rollup `changed=0` with final `00..05=cur-success`.
+- [2026-02-25T07:10:17Z] COMPLETED: Pinned ansible image in `.env.example` to `quay.io/ansible/creator-ee:v24.2.0` and validated runtime invocation.
+- [2026-02-25T07:11:34Z] COMPLETED: Cleaned local redundant ansible images/tags and retained only `creator-ee:v24.2.0`.
+- [2026-02-25T07:22:46Z] COMPLETED: Identified creator-ee compatibility issue (`ansible-core 2.16.3`) where `meta: end_role` caused rollup failure in phase03/05.
+- [2026-02-25T07:27:10Z] COMPLETED: Reworked phase03/05 rollup control flow to `include_tasks` gating and extracted apply sections to `rollup_apply.yml`.
+- [2026-02-25T07:29:58Z] COMPLETED: Passed full post-fix regression (`status 05 -> rollup 00-05 -> rollup 00-05 -> status 05`) with final idempotency restored.
 
 ## Technical Notes
 - **Migration Strategy:**

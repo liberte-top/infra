@@ -2,8 +2,8 @@
 
 - **Branch:** feat/simplify-infra-layer
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T06:51:06Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** phase03-05 改造与回归已完成，正在按用户要求整合为单一提交。
+- **Last-Sync:** 2026-02-25T07:30:26Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** 已固化 ansible 运行镜像标签并完成 creator-ee 兼容修复与完整回归，准备整理提交并推送。
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -60,6 +60,13 @@
 - [2026-02-25T06:47:38Z] UPDATE: Verified live regression chain (`status 05 -> rollup 03-05 -> rollup 03-05 -> status 05`) and final status is `00..05=cur-success`.
 - [2026-02-25T06:47:38Z] UPDATE: Third rollup 03-05 reached steady idempotency (`changed=0`) after first-pass facts normalization.
 - [2026-02-25T06:51:06Z] UPDATE: User requested consolidating current refactor into a single commit; preparing commit with synchronized .task records.
+- [2026-02-25T06:51:55Z] UPDATE: Consolidated refactor into single commit `04443e6` (`refactor: complete phase03-05 root-only tailscale facts model`).
+- [2026-02-25T07:03:42Z] UPDATE: Re-ran regression (`status 05 -> rollup 00-05 -> rollup 00-05 -> status 05`) and confirmed `00..05=cur-success` with second rollup `changed=0`.
+- [2026-02-25T07:10:17Z] UPDATE: Replaced ansible runtime image from `ghcr.io/ansible-community/community-ee-base:2.19.5-1` to pinned `quay.io/ansible/creator-ee:v24.2.0` in env examples.
+- [2026-02-25T07:11:34Z] UPDATE: Removed redundant local images/tags (legacy community-ee-base and creator-ee:latest), keeping only `creator-ee:v24.2.0`.
+- [2026-02-25T07:22:46Z] UPDATE: Found regression blocker on creator-ee (`ansible-core 2.16.3`) where `meta: end_role` is unsupported in phase03/05 rollup tasks.
+- [2026-02-25T07:27:10Z] UPDATE: Refactored phase03/05 rollup flow to compatibility-safe `include_tasks` apply path and added dedicated `rollup_apply.yml` files.
+- [2026-02-25T07:29:58Z] UPDATE: Completed full regression after compatibility fix (`status 05 -> rollup 00-05 -> rollup 00-05 -> status 05`), final status `00..05=cur-success`, second rollup `changed=0`.
 
 ## Global References
 - **Docs:** .task/MAIN.md
