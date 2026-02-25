@@ -2,8 +2,8 @@
 
 - **Branch:** feat/simplify-infra-layer
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T06:27:05Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** phase00-02 的 facts-only 与短路控制流统一已完成并回归通过；下一会话从 phase03（tailscale kubeconfig 标准化 + k8s-admin 解耦）继续。
+- **Last-Sync:** 2026-02-25T06:51:06Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** phase03-05 改造与回归已完成，正在按用户要求整合为单一提交。
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -52,6 +52,14 @@
 - [2026-02-25T06:25:47Z] UPDATE: Unified phase00/phase01 rollup short-circuit style to guarded apply blocks (`when: not ready`) for clearer and consistent control flow.
 - [2026-02-25T06:25:47Z] UPDATE: Verified phase00-01 regression (`rollup -> rollup -> status`) with both rollups `changed=0` and final status `00/01=cur-success`.
 - [2026-02-25T06:27:05Z] UPDATE: Session handoff checkpoint prepared; next implementation target is phase03 refactor.
+- [2026-02-25T06:34:26Z] UPDATE: Resumed Phase 1.3 implementation; scoped remaining work to phase03 kubeconfig refactor plus phase04/05 decoupling and status/facts consistency.
+- [2026-02-25T06:34:26Z] UPDATE: Refactored phase03 rollup/status/rollback to facts-only (`facts.json`), removed admin kubeconfig distribution, and standardized kubeconfig endpoint as tailscale FQDN.
+- [2026-02-25T06:34:26Z] UPDATE: Refactored phase04/05 rollup/status/rollback to facts-only (`facts.json`), removed status-file persistence path, and decoupled phase04 release root from `k8s-admin`.
+- [2026-02-25T06:34:26Z] UPDATE: Synced inventory/status docs and runtime vars (`k3s_tailscale_fqdn`, root-only allow users, AGENTS phase ownership text).
+- [2026-02-25T06:34:26Z] UPDATE: Completed syntax checks for rollup/status/rollback playbooks after refactor.
+- [2026-02-25T06:47:38Z] UPDATE: Verified live regression chain (`status 05 -> rollup 03-05 -> rollup 03-05 -> status 05`) and final status is `00..05=cur-success`.
+- [2026-02-25T06:47:38Z] UPDATE: Third rollup 03-05 reached steady idempotency (`changed=0`) after first-pass facts normalization.
+- [2026-02-25T06:51:06Z] UPDATE: User requested consolidating current refactor into a single commit; preparing commit with synchronized .task records.
 
 ## Global References
 - **Docs:** .task/MAIN.md

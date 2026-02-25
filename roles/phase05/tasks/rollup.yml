@@ -5,27 +5,27 @@
     state: directory
     mode: "0755"
 
-- name: Ensure phase05 state dir
+- name: Ensure phase05 facts dir
   file:
     path: /var/lib/infra/phase/05
     state: directory
     mode: "0755"
 
-- name: Stat phase05 state file
+- name: Stat phase05 facts file
   stat:
-    path: /var/lib/infra/phase/05/state.json
-  register: phase05_state_stat
+    path: /var/lib/infra/phase/05/facts.json
+  register: phase05_facts_stat
 
-- name: Read phase05 state file
+- name: Read phase05 facts file
   slurp:
-    src: /var/lib/infra/phase/05/state.json
-  register: phase05_state_raw
-  when: phase05_state_stat.stat.exists
+    src: /var/lib/infra/phase/05/facts.json
+  register: phase05_facts_raw
+  when: phase05_facts_stat.stat.exists
 
-- name: Parse phase05 state
-  when: phase05_state_raw is defined and phase05_state_raw.content is defined
+- name: Parse phase05 facts
+  when: phase05_facts_raw is defined and phase05_facts_raw.content is defined
   set_fact:
-    phase05_state_prev: "{{ phase05_state_raw.content | b64decode | from_json }}"
+    phase05_facts_prev: "{{ phase05_facts_raw.content | b64decode | from_json }}"
 
 - name: Normalize helm version
   set_fact:
@@ -73,7 +73,7 @@
       }}
 
 - name: Check cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=30s
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=30s
   register: phase05_cm_rollout
   changed_when: false
   failed_when: false
@@ -81,7 +81,9 @@
     - cert-manager
     - cert-manager-cainjector
     - cert-manager-webhook
-  when: phase05_state_prev is defined
+  loop_control:
+    loop_var: phase05_deploy
+  when: phase05_facts_prev is defined
   environment:
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
@@ -90,7 +92,7 @@
   register: phase05_cm_crd
   changed_when: false
   failed_when: false
-  when: phase05_state_prev is defined
+  when: phase05_facts_prev is defined
   environment:
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
@@ -105,25 +107,25 @@
           (phase05_cm_rollout.results | map(attribute='rc') | list | max | default(1)) == 0
         )
       }}
-  when: phase05_state_prev is defined
+  when: phase05_facts_prev is defined
 
 - name: Compute phase05 state match
   set_fact:
     phase05_state_matches: >-
       {{
-        (phase05_state_prev.phase | default('')) == '05' and
-        (phase05_state_prev.helm.version | default('')) == phase05_helm_version and
-        (phase05_state_prev.cert_manager.release | default('')) == cert_manager_release and
-        (phase05_state_prev.cert_manager.namespace | default('')) == cert_manager_namespace and
-        (phase05_state_prev.cert_manager.chart | default('')) == cert_manager_chart and
-        (phase05_state_prev.cert_manager.version | default('')) == cert_manager_version_lock and
-        (phase05_state_prev.cert_manager.crds_enabled | default(false)) == true
+        (phase05_facts_prev.phase | default('')) == '05' and
+        (phase05_facts_prev.helm.version | default('')) == phase05_helm_version and
+        (phase05_facts_prev.cert_manager.release | default('')) == cert_manager_release and
+        (phase05_facts_prev.cert_manager.namespace | default('')) == cert_manager_namespace and
+        (phase05_facts_prev.cert_manager.chart | default('')) == cert_manager_chart and
+        (phase05_facts_prev.cert_manager.version | default('')) == cert_manager_version_lock and
+        (phase05_facts_prev.cert_manager.crds_enabled | default(false)) == true
       }}
-  when: phase05_state_prev is defined
+  when: phase05_facts_prev is defined
 
 - name: Skip phase05 rollup when already ready
   meta: end_role
-  when: (phase05_state_prev is defined) and (phase05_state_matches | default(false)) and (phase05_ready | default(false))
+  when: (phase05_facts_prev is defined) and (phase05_state_matches | default(false)) and (phase05_ready | default(false))
 
 - name: Ensure helm temp dir
   file:
@@ -185,13 +187,15 @@
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Wait for cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ item }} --timeout=180s
+  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=180s
   register: phase05_cm_rollout_apply
   changed_when: false
   loop:
     - cert-manager
     - cert-manager-cainjector
     - cert-manager-webhook
+  loop_control:
+    loop_var: phase05_deploy
   environment:
     KUBECONFIG: "{{ phase05_kubeconfig }}"
 
@@ -200,9 +204,9 @@
   register: phase05_now
   changed_when: false
 
-- name: Build phase05 state
+- name: Build phase05 facts
   set_fact:
-    phase05_state:
+    phase05_facts:
       phase: "05"
       ok: true
       timestamp: "{{ phase05_now.stdout }}"
@@ -216,9 +220,9 @@
         version: "{{ cert_manager_version_lock }}"
         crds_enabled: true
 
-- name: Build phase05 state compare
+- name: Build phase05 facts compare
   set_fact:
-    phase05_state_compact:
+    phase05_facts_compact:
       phase: "05"
       ok: true
       helm:
@@ -230,25 +234,25 @@
         chart: "{{ cert_manager_chart }}"
         version: "{{ cert_manager_version_lock }}"
         crds_enabled: true
-    phase05_state_prev_compact: >-
+    phase05_facts_prev_compact: >-
       {{
-        (phase05_state_prev | default({}))
+        (phase05_facts_prev | default({}))
         | dict2items
         | rejectattr('key', 'equalto', 'timestamp')
         | items2dict
       }}
 
-- name: Check phase05 state change
+- name: Check phase05 facts change
   set_fact:
-    phase05_state_changed: >-
+    phase05_facts_changed: >-
       {{
-        (phase05_state_prev is not defined) or
-        (phase05_state_prev_compact != phase05_state_compact)
+        (phase05_facts_prev is not defined) or
+        (phase05_facts_prev_compact != phase05_facts_compact)
       }}
 
-- name: Write phase05 state file
+- name: Write phase05 facts file
   copy:
-    dest: /var/lib/infra/phase/05/state.json
-    content: "{{ phase05_state | to_nice_json }}"
+    dest: /var/lib/infra/phase/05/facts.json
+    content: "{{ phase05_facts | to_nice_json }}"
     mode: "0644"
-  when: phase05_state_changed | default(true)
+  when: phase05_facts_changed | default(true)

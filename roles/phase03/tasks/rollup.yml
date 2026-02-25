@@ -11,64 +11,85 @@
     state: directory
     mode: "0755"
 
-- name: Read phase03 state file
+- name: Stat phase03 facts file
+  stat:
+    path: /var/lib/infra/phase/03/facts.json
+  register: phase03_facts_stat
+
+- name: Read phase03 facts file
   slurp:
-    src: /var/lib/infra/phase/03/state.json
-  register: phase03_state_raw
-  ignore_errors: true
+    src: /var/lib/infra/phase/03/facts.json
+  register: phase03_facts_raw
+  when: phase03_facts_stat.stat.exists
 
-- name: Parse phase03 state
-  when: phase03_state_raw is defined and phase03_state_raw.content is defined
+- name: Parse phase03 facts
+  when: phase03_facts_raw is defined and phase03_facts_raw.content is defined
   set_fact:
-    phase03_state: "{{ phase03_state_raw.content | b64decode | from_json }}"
+    phase03_facts: "{{ phase03_facts_raw.content | b64decode | from_json }}"
 
-- name: Capture phase03 previous state
-  when: phase03_state is defined
+- name: Capture phase03 previous facts
+  when: phase03_facts is defined
   set_fact:
-    phase03_state_prev: "{{ phase03_state }}"
+    phase03_facts_prev: "{{ phase03_facts }}"
+
+- name: Normalize phase03 kubeconfig endpoint
+  set_fact:
+    phase03_kubeconfig_server: "https://{{ k3s_tailscale_fqdn | default(ansible_host) }}:6443"
 
 - name: Check k3s service status
   command: systemctl is-active k3s
   register: phase03_k3s_service
   changed_when: false
   failed_when: false
-  when: phase03_state is defined
+  when: phase03_facts is defined
 
 - name: Check k3s version
   command: /usr/local/bin/k3s --version
   register: phase03_k3s_version_check
   changed_when: false
   failed_when: false
-  when: phase03_state is defined
+  when: phase03_facts is defined
 
 - name: Check k3s node status
   command: /usr/local/bin/kubectl get nodes --request-timeout=5s
   register: phase03_k3s_nodes_check
   changed_when: false
   failed_when: false
-  when: phase03_state is defined
+  when: phase03_facts is defined
 
 - name: Check kubeconfig permissions
   stat:
     path: /etc/rancher/k3s/k3s.yaml
   register: phase03_kubeconfig_stat
-  when: phase03_state is defined
+  when: phase03_facts is defined
+
+- name: Read kubeconfig server endpoint
+  shell: |
+    set -euo pipefail
+    awk '/^[[:space:]]*server: / { print $2; exit }' /etc/rancher/k3s/k3s.yaml
+  args:
+    executable: /bin/bash
+  register: phase03_kubeconfig_server_raw
+  changed_when: false
+  failed_when: false
+  when: phase03_facts is defined
 
 - name: Compute phase03 state match
-  when: phase03_state is defined
+  when: phase03_facts is defined
   set_fact:
-    phase03_state_matches: >-
+    phase03_facts_matches: >-
       {{
-        (phase03_state.phase | default('')) == '03' and
-        (phase03_state.k3s.version | default('')) == k3s_version_lock and
-        (phase03_state.k3s.cni | default('')) == 'flannel' and
-        (phase03_state.k3s.addons | default('')) == 'default' and
-        (phase03_state.k3s.api_access | default('')) == 'ssh-only' and
-        (phase03_state.k3s.etcd_snapshot_retention | default(1)) == (k3s_etcd_snapshot_retention | default(1))
+        (phase03_facts.phase | default('')) == '03' and
+        (phase03_facts.k3s.version | default('')) == k3s_version_lock and
+        (phase03_facts.k3s.cni | default('')) == 'flannel' and
+        (phase03_facts.k3s.addons | default('')) == 'default' and
+        (phase03_facts.k3s.api_access | default('')) == 'tailscale-kubeconfig' and
+        (phase03_facts.k3s.etcd_snapshot_retention | default(1)) == (k3s_etcd_snapshot_retention | default(1)) and
+        (phase03_facts.kubeconfig.server | default('')) == phase03_kubeconfig_server
       }}
 
 - name: Compute phase03 k3s readiness
-  when: phase03_state is defined
+  when: phase03_facts is defined
   set_fact:
     phase03_k3s_ok: >-
       {{
@@ -81,17 +102,19 @@
         phase03_kubeconfig_stat is defined and
         phase03_kubeconfig_stat.stat is defined and
         (phase03_kubeconfig_stat.stat.exists | default(false)) and
-        (phase03_kubeconfig_stat.stat.grp | default('')) == k3s_admin_user and
-        (phase03_kubeconfig_stat.stat.mode | default('')) == '0640'
+        (phase03_kubeconfig_stat.stat.pw_name | default('')) == 'root' and
+        (phase03_kubeconfig_stat.stat.gr_name | default('')) == 'root' and
+        (phase03_kubeconfig_stat.stat.mode | default('')) == '0600' and
+        (phase03_kubeconfig_server_raw.stdout | default('')) == phase03_kubeconfig_server
       }}
 
 - name: Compute phase03 ready flag
-  when: phase03_state is defined
+  when: phase03_facts is defined
   set_fact:
-    phase03_ready: "{{ phase03_state_matches and phase03_k3s_ok and phase03_kubeconfig_ok }}"
+    phase03_ready: "{{ phase03_facts_matches and phase03_k3s_ok and phase03_kubeconfig_ok }}"
 
 - name: Compute phase03 skip flag
-  when: phase03_state is defined
+  when: phase03_facts is defined
   set_fact:
     phase03_skip: "{{ phase03_ready }}"
 
@@ -167,7 +190,7 @@
     set -o pipefail
     timeout 900s sh -c 'curl -sfL https://get.k3s.io | \
       INSTALL_K3S_VERSION="{{ phase03_k3s_version_resolved }}" \
-      INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}" \
+      INSTALL_K3S_EXEC="server --write-kubeconfig-mode 600 --tls-san={{ k3s_tailscale_fqdn | default(ansible_host) }} --etcd-snapshot-retention={{ k3s_etcd_snapshot_retention | default(1) }}" \
       sh -'
   args:
     executable: /bin/bash
@@ -180,29 +203,18 @@
     state: started
     enabled: true
 
-- name: Ensure kubeconfig is readable by admin group
+- name: Ensure kubeconfig ownership and mode
   file:
     path: /etc/rancher/k3s/k3s.yaml
     owner: root
-    group: "{{ k3s_admin_user }}"
-    mode: "0640"
-
-- name: Ensure admin kubeconfig directory
-  file:
-    path: "/home/{{ k3s_admin_user }}/.kube"
-    state: directory
-    owner: "{{ k3s_admin_user }}"
-    group: "{{ k3s_admin_user }}"
-    mode: "0700"
-
-- name: Copy kubeconfig for admin user
-  copy:
-    src: /etc/rancher/k3s/k3s.yaml
-    dest: "/home/{{ k3s_admin_user }}/.kube/config"
-    owner: "{{ k3s_admin_user }}"
-    group: "{{ k3s_admin_user }}"
+    group: root
     mode: "0600"
-    remote_src: true
+
+- name: Ensure kubeconfig uses tailscale endpoint
+  replace:
+    path: /etc/rancher/k3s/k3s.yaml
+    regexp: '(^[[:space:]]*server: ).*$'
+    replace: '\1{{ phase03_kubeconfig_server }}'
 
 - name: Check k3s node status
   command: /usr/local/bin/kubectl get nodes --request-timeout=20s
@@ -218,61 +230,61 @@
   register: phase03_now
   changed_when: false
 
-- name: Build phase03 state
+- name: Build phase03 facts
   set_fact:
-    phase03_state:
+    phase03_facts:
       phase: "03"
       ok: true
       timestamp: "{{ phase03_now.stdout }}"
       k3s:
         version: "{{ phase03_k3s_version_resolved | default('unknown') }}"
         installed_version: "{{ phase03_k3s_installed_version | default('unknown') }}"
-        api_access: "ssh-only"
+        api_access: "tailscale-kubeconfig"
         addons: "default"
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
       kubeconfig:
         system_path: "/etc/rancher/k3s/k3s.yaml"
-        system_group: "{{ k3s_admin_user }}"
-        system_mode: "0640"
-        path: "/home/{{ k3s_admin_user }}/.kube/config"
+        server: "{{ phase03_kubeconfig_server }}"
+        system_group: "root"
+        system_mode: "0600"
 
-- name: Build phase03 state compare
+- name: Build phase03 facts compare
   set_fact:
-    phase03_state_compact:
+    phase03_facts_compact:
       phase: "03"
       ok: true
       k3s:
         version: "{{ phase03_k3s_version_resolved | default('unknown') }}"
         installed_version: "{{ phase03_k3s_installed_version | default('unknown') }}"
-        api_access: "ssh-only"
+        api_access: "tailscale-kubeconfig"
         addons: "default"
         cni: "flannel"
         etcd_snapshot_retention: "{{ k3s_etcd_snapshot_retention | default(1) }}"
       kubeconfig:
         system_path: "/etc/rancher/k3s/k3s.yaml"
-        system_group: "{{ k3s_admin_user }}"
-        system_mode: "0640"
-        path: "/home/{{ k3s_admin_user }}/.kube/config"
-    phase03_state_prev_compact: >-
+        server: "{{ phase03_kubeconfig_server }}"
+        system_group: "root"
+        system_mode: "0600"
+    phase03_facts_prev_compact: >-
       {{
-        (phase03_state_prev | default({}))
+        (phase03_facts_prev | default({}))
         | dict2items
         | rejectattr('key', 'equalto', 'timestamp')
         | items2dict
       }}
 
-- name: Check phase03 state change
+- name: Check phase03 facts change
   set_fact:
-    phase03_state_changed: >-
+    phase03_facts_changed: >-
       {{
-        (phase03_state_prev is not defined) or
-        (phase03_state_prev_compact != phase03_state_compact)
+        (phase03_facts_prev is not defined) or
+        (phase03_facts_prev_compact != phase03_facts_compact)
       }}
 
-- name: Write phase03 state file
+- name: Write phase03 facts file
   copy:
-    dest: /var/lib/infra/phase/03/state.json
-    content: "{{ phase03_state | to_nice_json }}"
+    dest: /var/lib/infra/phase/03/facts.json
+    content: "{{ phase03_facts | to_nice_json }}"
     mode: "0644"
-  when: phase03_state_changed | default(true)
+  when: phase03_facts_changed | default(true)

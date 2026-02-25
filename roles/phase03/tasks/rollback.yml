@@ -21,11 +21,6 @@
     - /var/lib/cni
     - /etc/cni
 
-- name: Remove admin kubeconfig
-  file:
-    path: "/home/{{ k3s_admin_user }}/.kube/config"
-    state: absent
-
 - name: Remove k3s sysctl settings
   file:
     path: /etc/sysctl.d/99-k3s.conf
@@ -36,7 +31,7 @@
   register: phase03_sysctl_apply
   changed_when: false
 
-- name: Remove phase03 state file
+- name: Remove phase03 facts file
   file:
-    path: /var/lib/infra/phase/03/state.json
+    path: /var/lib/infra/phase/03/facts.json
     state: absent

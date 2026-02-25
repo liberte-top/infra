@@ -45,9 +45,9 @@ infra/
 
 ## Phase Ownership Snapshot
 - `phase00`: base OS packages and phase state bootstrap.
-- `phase01`: SSH hardening + admin user/sudo baseline.
+- `phase01`: root-only SSH hardening baseline.
 - `phase02`: UFW + sysctl hardening.
-- `phase03`: k3s install/verify lifecycle.
+- `phase03`: k3s install/verify + tailscale kubeconfig endpoint standardization.
 - `phase04`: maintenance timers (image GC, logrotate, release prune).
 - `phase05`: helm + cert-manager lifecycle.
 
@@ -60,6 +60,10 @@ infra/
 - `INFRA_SSH_HOST`: target host/IP for ansible inventory host.
 - `INFRA_SSH_USER`: SSH user for target host.
 - `INFRA_SSH_PRIVATE_KEY_B64` (required): base64-encoded private key, decoded at runtime.
+
+## Core Inventory Variables
+- `root_pubkey`: SSH key allowed for `root`.
+- `k3s_tailscale_fqdn`: tailscale/MagicDNS endpoint used in k3s kubeconfig server URL (default `ansible_host`).
 
 ## Execution Entry
 - Always run ansible through `scripts/ansible.sh`.
