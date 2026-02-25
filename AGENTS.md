@@ -74,6 +74,8 @@ infra/
 ## Common Commands
 - `./scripts/ssh.sh`
 - `./scripts/ssh.sh uname -a`
+- `./scripts/kubectl.sh`
+- `./scripts/kubectl.sh get nodes -o wide`
 - `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=03`
 - `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
 - `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
