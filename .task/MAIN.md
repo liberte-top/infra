@@ -2,8 +2,8 @@
 
 - **Branch:** feat/simplify-infra-layer
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T04:41:48Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** 已将临时 SSH key 文件生成逻辑抽到 utils.sh，ansible/ssh 脚本统一复用。
+- **Last-Sync:** 2026-02-25T05:24:22Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** 会话交接已准备完毕；下一会话从 phase02 依赖修复（community.general）继续推进。
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -20,6 +20,13 @@
 - [2026-02-25T04:38:58Z] UPDATE: Extracted default-args normalization into scripts/utils.sh (normalize_args) and wired ansible.sh to use it.
 - [2026-02-25T04:40:02Z] UPDATE: Applied the same simplification to scripts/ssh.sh using normalize_args and require_command ssh.
 - [2026-02-25T04:41:48Z] UPDATE: Extracted temporary SSH key file generation into shared utils function and reused it in ansible.sh/ssh.sh.
+- [2026-02-25T04:47:37Z] UPDATE: Performed read-only server status audit (phase_target=05) and collected on-host phase files to verify real progress.
+- [2026-02-25T04:54:58Z] UPDATE: Ran deployment verification (rollup 00->02 + status 02). Phase01 reached cur-success; phase02 blocked by missing ansible collection for ufw module.
+- [2026-02-25T04:59:16Z] UPDATE: Confirmed root cause by inspecting phase02 tasks and ansible-galaxy collections list; community.general is missing from current execution image.
+- [2026-02-25T05:12:04Z] UPDATE: Researched and tested common EE images; none provided community.general out-of-box in this environment.
+- [2026-02-25T05:16:34Z] UPDATE: Cleaned local redundant docker images via image prune and captured before/after disk usage.
+- [2026-02-25T05:18:13Z] UPDATE: Audited docker build cache state (builder du/verbose) and prepared selective prune strategy.
+- [2026-02-25T05:24:22Z] UPDATE: Prepared handoff context for next session; next focus is phase02 dependency fix and redeploy validation.
 
 ## Global References
 - **Docs:** .task/MAIN.md
