@@ -25,9 +25,14 @@
 - [2026-02-25T09:37:34Z] @ZQXY123deMacBook-Pro.local: User changed direction: remove tailscale logic and use plain SSH remote kubectl flow.
 - [2026-02-25T09:44:56Z] @ZQXY123deMacBook-Pro.local: Hard-cut migration completed (`k3s_api_endpoint` + `ssh-kubeconfig` semantics) and runtime validations passed.
 - [2026-02-25T09:51:50Z] @ZQXY123deMacBook-Pro.local: Saved handoff checkpoint via WIP commit `9297f34` for next session.
+- [2026-02-25T09:55:27Z] @ZQXY123deMacBook-Pro.local: Simplified kubectl wrapper by removing duplicated env checks and kubeconfig arg scan; switched to remote `KUBECONFIG` default injection.
+- [2026-02-25T09:56:54Z] @ZQXY123deMacBook-Pro.local: Removed unused `scripts/ci.sh` and updated AGENTS script list accordingly.
+- [2026-02-25T09:58:56Z] @ZQXY123deMacBook-Pro.local: Tightened kubectl env contract: `INFRA_KUBECTL_BIN` and `INFRA_KUBECONFIG_PATH` are now required; defaults added in `.env.example`.
+- [2026-02-25T09:59:42Z] @ZQXY123deMacBook-Pro.local: Re-validated with updated local `.env`; kubectl wrapper executes successfully and node listing is healthy.
+- [2026-02-25T10:10:01Z] @ZQXY123deMacBook-Pro.local: Split phase05/phase06 responsibilities: phase05 helm-only, phase06 cert-manager lifecycle; status/rollup validation passed with phase target 06.
 
 ## Technical Notes
-- **Files Touched:** .task/*, scripts/kubectl.sh, AGENTS.md, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup_apply}.yml, inventory/group_vars/all.yml, playbooks/status.yml
+- **Files Touched:** .task/*, scripts/kubectl.sh, .env.example, AGENTS.md, playbooks/{rollup,rollback,status}.yml, playbooks/phases/phase_06.yml, roles/phase00/tasks/rollup.yml, roles/phase03/tasks/{rollup,rollup_apply}.yml, roles/phase05/tasks/{rollup,rollup_apply,status,rollback}.yml, roles/phase06/tasks/{rollup,rollup_apply,status,rollback}.yml, inventory/group_vars/all.yml
 - **New Dependencies:** 无
 - **Blockers:** 无
 

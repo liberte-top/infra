@@ -2,8 +2,8 @@
 
 - **Branch:** feat/add-kubeconfig-smoke-check
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T09:51:50Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** WIP checkpoint committed for session handoff; workspace clean and ready for next session follow-up.
+- **Last-Sync:** 2026-02-25T10:10:01Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** Phase split completed: phase05 now helm-only, phase06 manages cert-manager; full `00->06` rollup converges and idempotency passes.
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -26,6 +26,15 @@
 - [2026-02-25T09:44:56Z] UPDATE: Validated runtime: `./scripts/kubectl.sh` succeeds; `status phase_target=03` succeeds; `rollup 00->03` succeeds and idempotency pass returns `changed=0`.
 - [2026-02-25T09:50:18Z] UPDATE: Full regression passed: `status phase_target=05` all `cur-success`; `rollup 00->05` succeeded; second `rollup 00->05` idempotency pass returned `changed=0`.
 - [2026-02-25T09:51:50Z] UPDATE: Created WIP commit `9297f34` (`WIP: hard-cut tailscale path and validate phase 00-05`) for next-session continuation.
+- [2026-02-25T09:55:27Z] UPDATE: Simplified `scripts/kubectl.sh`: removed duplicated `require_env` checks and `--kubeconfig` arg scanning; now passes `KUBECONFIG` env to remote kubectl by default.
+- [2026-02-25T09:55:27Z] UPDATE: Validation passed after simplification (`bash -n scripts/kubectl.sh` and `./scripts/kubectl.sh`).
+- [2026-02-25T09:56:54Z] UPDATE: Removed `scripts/ci.sh` per user request and updated AGENTS repository map; grep check confirms no residual `ci.sh` references.
+- [2026-02-25T09:58:56Z] UPDATE: Updated `scripts/kubectl.sh` to require `INFRA_KUBECTL_BIN` and `INFRA_KUBECONFIG_PATH` as mandatory env vars.
+- [2026-02-25T09:58:56Z] UPDATE: Added kubectl defaults to `.env.example` and documented both vars in AGENTS runtime parameters.
+- [2026-02-25T09:58:56Z] UPDATE: Validation: syntax passed; runtime intentionally fails on current local `.env` because required kubectl vars are not yet configured.
+- [2026-02-25T09:59:42Z] UPDATE: Re-validation after user `.env` update passed; both kubectl env vars are present and `./scripts/kubectl.sh` returns healthy node list.
+- [2026-02-25T10:10:01Z] UPDATE: Refactored phase model: extracted cert-manager lifecycle from phase05 into new phase06; phase05 now owns helm binary lifecycle only.
+- [2026-02-25T10:10:01Z] UPDATE: Validation passed: `status phase_target=06` all `cur-success`; first `rollup 00->06` converged; second `rollup 00->06` idempotency pass returned `changed=0`.
 
 ## Global References
 - **Docs:** .task/MAIN.md

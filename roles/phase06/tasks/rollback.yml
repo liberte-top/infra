@@ -1,0 +1,21 @@
+---
+- name: Uninstall cert-manager release
+  command: /usr/local/bin/helm uninstall "{{ cert_manager_release }}" -n "{{ cert_manager_namespace }}"
+  register: phase06_uninstall
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Remove cert-manager namespace (optional)
+  command: /usr/local/bin/kubectl delete namespace "{{ cert_manager_namespace }}"
+  when: cert_manager_purge_namespace | default(false)
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Remove phase06 facts file
+  file:
+    path: /var/lib/infra/phase/06/facts.json
+    state: absent

@@ -34,7 +34,6 @@
         (helm_version_lock | regex_search('^v'))
         | ternary(helm_version_lock, 'v' ~ helm_version_lock)
       }}
-    phase05_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Detect system architecture
   command: uname -m
@@ -61,8 +60,6 @@
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute helm version match
   set_fact:
@@ -72,40 +69,11 @@
         (phase05_helm_version_raw.stdout | default('')) is search(phase05_helm_version)
       }}
 
-- name: Check cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=30s
-  register: phase05_cm_rollout
-  changed_when: false
-  failed_when: false
-  loop:
-    - cert-manager
-    - cert-manager-cainjector
-    - cert-manager-webhook
-  loop_control:
-    loop_var: phase05_deploy
-  when: phase05_facts_prev is defined
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
-- name: Check cert-manager CRD
-  command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
-  register: phase05_cm_crd
-  changed_when: false
-  failed_when: false
-  when: phase05_facts_prev is defined
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
 - name: Compute phase05 readiness
   set_fact:
     phase05_ready: >-
       {{
-        (phase05_helm_version_ok | default(false)) and
-        (phase05_cm_crd is defined and (phase05_cm_crd.rc | default(1)) == 0) and
-        (
-          phase05_cm_rollout is defined and
-          (phase05_cm_rollout.results | map(attribute='rc') | list | max | default(1)) == 0
-        )
+        (phase05_helm_version_ok | default(false))
       }}
   when: phase05_facts_prev is defined
 
@@ -115,11 +83,7 @@
       {{
         (phase05_facts_prev.phase | default('')) == '05' and
         (phase05_facts_prev.helm.version | default('')) == phase05_helm_version and
-        (phase05_facts_prev.cert_manager.release | default('')) == cert_manager_release and
-        (phase05_facts_prev.cert_manager.namespace | default('')) == cert_manager_namespace and
-        (phase05_facts_prev.cert_manager.chart | default('')) == cert_manager_chart and
-        (phase05_facts_prev.cert_manager.version | default('')) == cert_manager_version_lock and
-        (phase05_facts_prev.cert_manager.crds_enabled | default(false)) == true
+        (phase05_facts_prev.helm.path | default('')) == '/usr/local/bin/helm'
       }}
   when: phase05_facts_prev is defined
 

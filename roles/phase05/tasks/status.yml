@@ -38,7 +38,6 @@
         (helm_version_lock | regex_search('^v'))
         | ternary(helm_version_lock, 'v' ~ helm_version_lock)
       }}
-    phase05_kubeconfig: "{{ cert_manager_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
 
 - name: Check helm binary
   stat:
@@ -51,8 +50,6 @@
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
 
 - name: Compute helm version match
   set_fact:
@@ -62,52 +59,11 @@
         (phase05_helm_version_raw.stdout | default('')) is search(phase05_helm_version)
       }}
 
-- name: Check helm release status
-  command: /usr/local/bin/helm status "{{ cert_manager_release }}" -n "{{ cert_manager_namespace }}"
-  register: phase05_helm_status
-  changed_when: false
-  failed_when: false
-  when: phase05_helm_bin.stat.exists
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
-- name: Check cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=30s
-  register: phase05_cm_rollout
-  changed_when: false
-  failed_when: false
-  loop:
-    - cert-manager
-    - cert-manager-cainjector
-    - cert-manager-webhook
-  loop_control:
-    loop_var: phase05_deploy
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
-- name: Check cert-manager CRD
-  command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
-  register: phase05_cm_crd
-  changed_when: false
-  failed_when: false
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
 - name: Compute phase05 readiness
   set_fact:
     phase05_ready: >-
       {{
-        (phase05_helm_version_ok | default(false)) and
-        (phase05_helm_status is defined and (phase05_helm_status.rc | default(1)) == 0) and
-        (
-          (phase05_helm_status.stdout | default('')) is search('STATUS: deployed') or
-          (phase05_helm_status.stdout | default('')) is search('status: deployed')
-        ) and
-        (phase05_cm_crd is defined and (phase05_cm_crd.rc | default(1)) == 0) and
-        (
-          phase05_cm_rollout is defined and
-          (phase05_cm_rollout.results | map(attribute='rc') | list | max | default(1)) == 0
-        )
+        (phase05_helm_version_ok | default(false))
       }}
 
 - name: Compute phase05 status value

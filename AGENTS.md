@@ -27,16 +27,15 @@ infra/
 │   ├── rollup.yml
 │   ├── rollback.yml
 │   ├── status.yml
-│   └── phases/phase_00.yml..phase_05.yml  # Per-phase role dispatch
+│   └── phases/phase_00.yml..phase_06.yml  # Per-phase role dispatch
 ├── roles/                    # Desired state implementation by phase
-│   ├── phase00..phase05/
+│   ├── phase00..phase06/
 │   │   ├── tasks/{rollup,rollback,status}.yml
 │   │   └── templates/        # Present in phase02/phase04
 ├── scripts/                  # Operational entrypoints and local tooling
 │   ├── ansible.sh            # Single ansible runtime wrapper (containerized)
 │   ├── ssh.sh                # Direct SSH connectivity helper
 │   ├── utils.sh              # Shared shell helpers for scripts
-│   └── ci.sh                 # GitHub Actions workflow trigger helper
 ├── ansible.cfg               # Local ansible defaults
 ├── .env(.example)            # Runtime parameters
 ├── BOOTSTRAP.md              # Phase -1 manual server bootstrap
@@ -49,7 +48,8 @@ infra/
 - `phase02`: UFW + sysctl hardening.
 - `phase03`: k3s install/verify + kubeconfig endpoint standardization.
 - `phase04`: maintenance timers (image GC, logrotate, release prune).
-- `phase05`: helm + cert-manager lifecycle.
+- `phase05`: helm binary lifecycle.
+- `phase06`: cert-manager lifecycle.
 
 ## Phase Runtime Files
 - Persist phase facts in `/var/lib/infra/phase/<id>/facts.json`.
@@ -60,6 +60,8 @@ infra/
 - `INFRA_SSH_HOST`: target host/IP for ansible inventory host.
 - `INFRA_SSH_USER`: SSH user for target host.
 - `INFRA_SSH_PRIVATE_KEY_B64` (required): base64-encoded private key, decoded at runtime.
+- `INFRA_KUBECTL_BIN` (required by `scripts/kubectl.sh`): remote kubectl binary path.
+- `INFRA_KUBECONFIG_PATH` (required by `scripts/kubectl.sh`): remote kubeconfig path passed via `KUBECONFIG`.
 
 ## Core Inventory Variables
 - `root_pubkey`: SSH key allowed for `root`.
@@ -76,9 +78,9 @@ infra/
 - `./scripts/ssh.sh uname -a`
 - `./scripts/kubectl.sh`
 - `./scripts/kubectl.sh get nodes -o wide`
-- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=03`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=03`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=03`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=06`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=06`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=06`
 
 ## Phase00 Regression Checklist
 - `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=00`

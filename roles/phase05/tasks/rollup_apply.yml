@@ -45,32 +45,6 @@
     mode: "0755"
     remote_src: true
 
-- name: Install cert-manager via helm
-  command: >-
-    /usr/local/bin/helm upgrade --install "{{ cert_manager_release }}"
-    "{{ cert_manager_chart }}"
-    --version "{{ cert_manager_version_lock }}"
-    --namespace "{{ cert_manager_namespace }}"
-    --create-namespace
-    --set crds.enabled=true
-    --wait
-    --timeout 300s
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
-- name: Wait for cert-manager deployments
-  command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase05_deploy }} --timeout=180s
-  register: phase05_cm_rollout_apply
-  changed_when: false
-  loop:
-    - cert-manager
-    - cert-manager-cainjector
-    - cert-manager-webhook
-  loop_control:
-    loop_var: phase05_deploy
-  environment:
-    KUBECONFIG: "{{ phase05_kubeconfig }}"
-
 - name: Capture UTC timestamp
   command: date -u +%Y-%m-%dT%H:%M:%SZ
   register: phase05_now
@@ -85,12 +59,6 @@
       helm:
         version: "{{ phase05_helm_version }}"
         path: /usr/local/bin/helm
-      cert_manager:
-        release: "{{ cert_manager_release }}"
-        namespace: "{{ cert_manager_namespace }}"
-        chart: "{{ cert_manager_chart }}"
-        version: "{{ cert_manager_version_lock }}"
-        crds_enabled: true
 
 - name: Build phase05 facts compare
   set_fact:
@@ -100,12 +68,6 @@
       helm:
         version: "{{ phase05_helm_version }}"
         path: /usr/local/bin/helm
-      cert_manager:
-        release: "{{ cert_manager_release }}"
-        namespace: "{{ cert_manager_namespace }}"
-        chart: "{{ cert_manager_chart }}"
-        version: "{{ cert_manager_version_lock }}"
-        crds_enabled: true
     phase05_facts_prev_compact: >-
       {{
         (phase05_facts_prev | default({}))
