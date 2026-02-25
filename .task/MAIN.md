@@ -2,8 +2,8 @@
 
 - **Branch:** feat/simplify-infra-layer
 - **Status:** Active
-- **Last-Sync:** 2026-02-25T05:56:33Z (on ZQXY123deMacBook-Pro.local)
-- **Current Context:** phase00 已完成 tailscale 基础纳入并通过幂等回归；下一步进入 phase01 root-only 重构，并统一 phase01-05 仅 facts.json 持久化策略。
+- **Last-Sync:** 2026-02-25T06:27:05Z (on ZQXY123deMacBook-Pro.local)
+- **Current Context:** phase00-02 的 facts-only 与短路控制流统一已完成并回归通过；下一会话从 phase03（tailscale kubeconfig 标准化 + k8s-admin 解耦）继续。
 
 ## Phase Stack
 > Current execution depth (Top is active)
@@ -40,6 +40,18 @@
 - [2026-02-25T05:53:15Z] UPDATE: Completed phase00 refactor by adding tailscale baseline package path and passed status/rollup/idempotency/rollback/status regression chain.
 - [2026-02-25T05:53:15Z] UPDATE: Aligned implementation direction with user reminder: phase01-05 should persist only facts.json; status remains read-only validation.
 - [2026-02-25T05:56:33Z] UPDATE: Prepared session handoff checkpoint; next session starts from phase01 root-only + facts-only persistence refactor.
+- [2026-02-25T06:01:30Z] UPDATE: Started incremental phase01 refactor to root-only SSH model and facts-only persistence.
+- [2026-02-25T06:04:13Z] UPDATE: Completed phase01 rollup/status/rollback refactor (remove k3s_admin_user checks, switch to root key + facts.json, drop status.json writes).
+- [2026-02-25T06:04:13Z] UPDATE: Verified scoped regression for phase00-01 with status + rollup + idempotency rollup + status; all runs succeeded and second rollup stayed unchanged.
+- [2026-02-25T06:08:03Z] UPDATE: Completed phase02 rollup/status/rollback refactor to facts-only persistence (`facts.json`), and removed `status.json` read/write path.
+- [2026-02-25T06:08:03Z] UPDATE: Verified scoped regression for phase00-02 (`status -> rollup -> rollup -> status`); status remains `cur-success` for 00/01/02.
+- [2026-02-25T06:20:49Z] UPDATE: Simplified phase02 rollup control flow by guarding mutable tasks with `when: not phase02_ready`, preventing unnecessary apply path when already converged.
+- [2026-02-25T06:20:49Z] UPDATE: Aligned phase02 UFW logging readiness check with actual `ufw status verbose` format (`Logging: on (<level>)`) to make short-circuit effective.
+- [2026-02-25T06:20:49Z] UPDATE: Verified phase00-02 double rollup now both `changed=0`; final status remains `00/01/02=cur-success`.
+- [2026-02-25T06:25:47Z] UPDATE: Refactored phase01 rollup to use `stat + slurp when exists` for facts loading (removed error-driven control flow).
+- [2026-02-25T06:25:47Z] UPDATE: Unified phase00/phase01 rollup short-circuit style to guarded apply blocks (`when: not ready`) for clearer and consistent control flow.
+- [2026-02-25T06:25:47Z] UPDATE: Verified phase00-01 regression (`rollup -> rollup -> status`) with both rollups `changed=0` and final status `00/01=cur-success`.
+- [2026-02-25T06:27:05Z] UPDATE: Session handoff checkpoint prepared; next implementation target is phase03 refactor.
 
 ## Global References
 - **Docs:** .task/MAIN.md

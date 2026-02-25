@@ -26,17 +26,12 @@
   register: phase02_sysctl_apply
   changed_when: false
 
-- name: Remove phase02 state file
+- name: Remove phase02 facts file
   file:
-    path: /var/lib/infra/phase/02/state.json
+    path: /var/lib/infra/phase/02/facts.json
     state: absent
 
-- name: Remove phase02 status file
-  file:
-    path: /var/lib/infra/phase/02/status.json
-    state: absent
-
-- name: Remove phase02 state dir (if empty)
+- name: Remove phase02 facts dir (if empty)
   file:
     path: /var/lib/infra/phase/02
     state: absent

@@ -9,39 +9,22 @@
     state: directory
     mode: "0755"
 
-- name: Ensure phase01 state dir
+- name: Ensure phase01 facts dir
   file:
     path: /var/lib/infra/phase/01
     state: directory
     mode: "0755"
 
-- name: Read phase01 state file
+- name: Read phase01 facts file
   slurp:
-    src: /var/lib/infra/phase/01/state.json
-  register: phase01_state_raw
+    src: /var/lib/infra/phase/01/facts.json
+  register: phase01_facts_raw
   ignore_errors: true
 
-- name: Read phase01 status file
-  slurp:
-    src: /var/lib/infra/phase/01/status.json
-  register: phase01_status_raw
-  ignore_errors: true
-
-- name: Parse phase01 state
-  when: phase01_state_raw is defined and phase01_state_raw.content is defined
+- name: Parse phase01 facts
+  when: phase01_facts_raw is defined and phase01_facts_raw.content is defined
   set_fact:
-    phase01_state: "{{ phase01_state_raw.content | b64decode | from_json }}"
-
-- name: Parse phase01 status
-  when: phase01_status_raw is defined and phase01_status_raw.content is defined
-  set_fact:
-    phase01_status_prev: "{{ phase01_status_raw.content | b64decode | from_json }}"
-
-- name: Check admin user exists
-  command: "getent passwd {{ k3s_admin_user }}"
-  register: phase01_admin_user_check
-  changed_when: false
-  failed_when: false
+    phase01_facts: "{{ phase01_facts_raw.content | b64decode | from_json }}"
 
 - name: Slurp root authorized_keys
   slurp:
@@ -49,26 +32,12 @@
   register: phase01_root_keys
   ignore_errors: true
 
-- name: Slurp admin authorized_keys
-  slurp:
-    src: "/home/{{ k3s_admin_user }}/.ssh/authorized_keys"
-  register: phase01_admin_keys
-  ignore_errors: true
-
 - name: Check root key presence
   set_fact:
     phase01_root_key_present: >-
       {{
         phase01_root_keys is defined and phase01_root_keys.content is defined and
-        ((phase01_root_keys.content | b64decode) | trim | length > 0)
-      }}
-
-- name: Check admin key presence
-  set_fact:
-    phase01_admin_key_present: >-
-      {{
-        phase01_admin_keys is defined and phase01_admin_keys.content is defined and
-        (phase01_admin_keys.content | b64decode).find(k3s_admin_pubkey) != -1
+        (phase01_root_keys.content | b64decode).find(root_pubkey) != -1
       }}
 
 - name: Check effective sshd settings
@@ -89,8 +58,17 @@
         ('passwordauthentication no' in phase01_sshd_effective.stdout) and
         ('kbdinteractiveauthentication no' in phase01_sshd_effective.stdout) and
         ('pubkeyauthentication yes' in phase01_sshd_effective.stdout) and
-        ('allowusers root' in phase01_sshd_effective.stdout) and
-        ('allowusers ' ~ k3s_admin_user in phase01_sshd_effective.stdout)
+        ('allowusers root' in phase01_sshd_effective.stdout)
+      }}
+
+- name: Check facts consistency
+  set_fact:
+    phase01_facts_match: >-
+      {{
+        phase01_facts is defined and
+        (phase01_facts.phase | default('')) == '01' and
+        (phase01_facts.users.root_pubkey | default('')) == root_pubkey and
+        (phase01_facts.ssh.allow_users | default([])) == ['root']
       }}
 
 - name: Compute phase01 status value
@@ -101,14 +79,13 @@
         else
         (
           'cur-success' if (
-            (phase01_admin_user_check.rc == 0) and
+            phase01_facts_match and
             phase01_root_key_present and
-            phase01_admin_key_present and
             phase01_sshd_ok
           )
           else
           (
-            'cur-failed' if phase01_state is defined
+            'cur-failed' if phase01_facts is defined
             else 'pre-ready'
           )
         )
@@ -117,23 +94,3 @@
 - name: Set phase01 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase01_status_value }) }}"
-
-- name: Check phase01 status change
-  set_fact:
-    phase01_status_changed: >-
-      {{
-        (phase01_status_prev is not defined) or
-        (phase01_status_prev.status | default('') != phase01_status_value)
-      }}
-
-- name: Capture UTC timestamp
-  command: date -u +%Y-%m-%dT%H:%M:%SZ
-  register: phase01_status_now
-  changed_when: false
-
-- name: Write phase01 status file
-  copy:
-    dest: /var/lib/infra/phase/01/status.json
-    content: "{{ {'phase': '01', 'status': phase01_status_value, 'timestamp': phase01_status_now.stdout} | to_nice_json }}"
-    mode: "0644"
-  when: phase01_status_changed | default(true)

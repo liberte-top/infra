@@ -1,22 +1,4 @@
 ---
-- name: Remove admin authorized key
-  authorized_key:
-    user: "{{ k3s_admin_user }}"
-    key: "{{ k3s_admin_pubkey }}"
-    state: absent
-  ignore_errors: true
-
-- name: Remove admin sudoers
-  file:
-    path: "/etc/sudoers.d/90-{{ k3s_admin_user }}"
-    state: absent
-
-- name: Remove admin user
-  user:
-    name: "{{ k3s_admin_user }}"
-    state: absent
-    remove: true
-
 - name: Remove sshd hardening drop-in
   file:
     path: /etc/ssh/sshd_config.d/99-liberte.conf
@@ -37,17 +19,12 @@
     name: ssh
     state: reloaded
 
-- name: Remove phase01 state file
+- name: Remove phase01 facts file
   file:
-    path: /var/lib/infra/phase/01/state.json
+    path: /var/lib/infra/phase/01/facts.json
     state: absent
 
-- name: Remove phase01 status file
-  file:
-    path: /var/lib/infra/phase/01/status.json
-    state: absent
-
-- name: Remove phase01 state dir (if empty)
+- name: Remove phase01 facts dir (if empty)
   file:
     path: /var/lib/infra/phase/01
     state: absent

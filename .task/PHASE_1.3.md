@@ -5,7 +5,7 @@
 
 ## Exit Criteria
 - [x] phase00 纳入 tailscale 基础安装（不包含一次性手工迁移逻辑）。
-- [ ] phase01 切换为 root-only SSH 体系，移除 `k3s_admin_user` 相关状态与检查。
+- [x] phase01 切换为 root-only SSH 体系，移除 `k3s_admin_user` 相关状态与检查。
 - [ ] phase03 移除 admin kubeconfig 分发，改为 tailscale FQDN + kubeconfig 标准路径模型。
 - [ ] phase04/05 清理 `k8s-admin` 路径耦合并保持可回归执行。
 - [ ] 关键文档与变量定义完成同步（inventory/AGENTS/状态输出）。
@@ -18,6 +18,18 @@
 - [2026-02-25T05:52:57Z] COMPLETED: Verified phase00 rollback path after tailscale inclusion.
 - [2026-02-25T05:53:08Z] COMPLETED: Verified post-rollback status returns `phase=00 status=pre-ready`.
 - [2026-02-25T05:53:15Z] UPDATED: User clarified phase01-05 should keep only facts.json persistence; next edits will apply this rule incrementally.
+- [2026-02-25T06:01:30Z] COMPLETED: Refactored phase01 rollup/status/rollback to root-only model and switched phase01 state persistence from `state.json` to `facts.json`.
+- [2026-02-25T06:01:30Z] COMPLETED: Removed phase01 `status.json` read/write path; status play now computes live state and only updates `phase_status_map`.
+- [2026-02-25T06:04:13Z] COMPLETED: Passed scoped validation for phase00-01 (`status -> rollup -> rollup(idempotency) -> status`), with second rollup reporting zero changes.
+- [2026-02-25T06:08:03Z] COMPLETED: Refactored phase02 rollup/status/rollback to `facts.json` persistence and removed `status.json` read/write.
+- [2026-02-25T06:08:03Z] COMPLETED: Passed scoped validation for phase00-02 (`status -> rollup -> rollup -> status`) with final status `00/01/02=cur-success`.
+- [2026-02-25T06:20:49Z] COMPLETED: Simplified phase02 rollup control flow by wrapping mutable tasks in a `when: not phase02_ready` block.
+- [2026-02-25T06:20:49Z] COMPLETED: Fixed phase02 UFW logging readiness pattern to match `ufw status verbose`, making rollup short-circuit deterministic.
+- [2026-02-25T06:20:49Z] COMPLETED: Re-validated phase00-02 double rollup with both runs `changed=0` and no phase02 mutate-path execution.
+- [2026-02-25T06:25:47Z] COMPLETED: Refactored phase01 facts loading from `ignore_errors` pattern to `stat + conditional slurp`, aligning with phase00 style.
+- [2026-02-25T06:25:47Z] COMPLETED: Unified phase00/phase01 rollup control flow with guarded apply blocks (`when: not ready`) for consistent behavior across phases.
+- [2026-02-25T06:25:47Z] COMPLETED: Re-validated phase00-01 (`rollup -> rollup -> status`) with both rollups `changed=0` and final status `00/01=cur-success`.
+- [2026-02-25T06:27:05Z] UPDATED: Prepared handoff for next session; phase03 is the next incremental target.
 
 ## Technical Notes
 - **Migration Strategy:**
