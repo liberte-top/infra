@@ -39,6 +39,7 @@
 - name: Check helm release status
   command: /usr/local/bin/helm status "{{ cert_manager_release }}" -n "{{ cert_manager_namespace }}"
   register: phase06_helm_status
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase06_facts_prev is defined and phase06_helm_bin.stat.exists
@@ -48,6 +49,7 @@
 - name: Check cert-manager deployments
   command: /usr/local/bin/kubectl -n "{{ cert_manager_namespace }}" rollout status deploy/{{ phase06_deploy }} --timeout=30s
   register: phase06_cm_rollout
+  check_mode: no
   changed_when: false
   failed_when: false
   loop:
@@ -63,6 +65,7 @@
 - name: Check cert-manager CRD
   command: /usr/local/bin/kubectl get crd certificates.cert-manager.io
   register: phase06_cm_crd
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase06_facts_prev is defined

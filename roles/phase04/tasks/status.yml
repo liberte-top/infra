@@ -3,18 +3,6 @@
   set_fact:
     phase04_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
-- name: Ensure infra phase base dir
-  file:
-    path: /var/lib/infra/phase
-    state: directory
-    mode: "0755"
-
-- name: Ensure phase04 facts dir
-  file:
-    path: /var/lib/infra/phase/04
-    state: directory
-    mode: "0755"
-
 - name: Stat phase04 facts file
   stat:
     path: /var/lib/infra/phase/04/facts.json
@@ -95,3 +83,13 @@
 - name: Set phase04 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase04_status_value }) }}"
+    phase_reason_map: >-
+      {{
+        (hostvars[inventory_hostname].phase_reason_map | default({}))
+        | combine({
+          phase_id: (
+            'ready' if phase04_status_value == 'cur-success'
+            else 'maintenance timer or config missing'
+          )
+        })
+      }}

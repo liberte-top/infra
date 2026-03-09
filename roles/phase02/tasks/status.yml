@@ -3,23 +3,16 @@
   set_fact:
     phase02_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
-- name: Ensure infra phase base dir
-  file:
-    path: /var/lib/infra/phase
-    state: directory
-    mode: "0755"
-
-- name: Ensure phase02 facts dir
-  file:
-    path: /var/lib/infra/phase/02
-    state: directory
-    mode: "0755"
+- name: Stat phase02 facts file
+  stat:
+    path: /var/lib/infra/phase/02/facts.json
+  register: phase02_facts_stat
 
 - name: Read phase02 facts file
   slurp:
     src: /var/lib/infra/phase/02/facts.json
   register: phase02_facts_raw
-  ignore_errors: true
+  when: phase02_facts_stat.stat.exists
 
 - name: Parse phase02 facts
   when: phase02_facts_raw is defined and phase02_facts_raw.content is defined
@@ -137,3 +130,13 @@
 - name: Set phase02 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase02_status_value }) }}"
+    phase_reason_map: >-
+      {{
+        (hostvars[inventory_hostname].phase_reason_map | default({}))
+        | combine({
+          phase_id: (
+            'ready' if phase02_status_value == 'cur-success'
+            else 'ufw, sysctl, or facts mismatch'
+          )
+        })
+      }}

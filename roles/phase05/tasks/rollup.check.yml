@@ -38,6 +38,7 @@
 - name: Detect system architecture
   command: uname -m
   register: phase05_uname
+  check_mode: no
   changed_when: false
 
 - name: Map helm architecture
@@ -57,6 +58,7 @@
 - name: Read helm version
   command: /usr/local/bin/helm version --short
   register: phase05_helm_version_raw
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase05_helm_bin.stat.exists

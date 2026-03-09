@@ -3,18 +3,6 @@
   set_fact:
     phase05_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
-- name: Ensure infra phase base dir
-  file:
-    path: /var/lib/infra/phase
-    state: directory
-    mode: "0755"
-
-- name: Ensure phase05 facts dir
-  file:
-    path: /var/lib/infra/phase/05
-    state: directory
-    mode: "0755"
-
 - name: Stat phase05 facts file
   stat:
     path: /var/lib/infra/phase/05/facts.json
@@ -85,3 +73,13 @@
 - name: Set phase05 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase05_status_value }) }}"
+    phase_reason_map: >-
+      {{
+        (hostvars[inventory_hostname].phase_reason_map | default({}))
+        | combine({
+          phase_id: (
+            'ready' if phase05_status_value == 'cur-success'
+            else 'helm binary missing or version mismatch'
+          )
+        })
+      }}

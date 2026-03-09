@@ -3,18 +3,6 @@
   set_fact:
     phase06_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
 
-- name: Ensure infra phase base dir
-  file:
-    path: /var/lib/infra/phase
-    state: directory
-    mode: "0755"
-
-- name: Ensure phase06 facts dir
-  file:
-    path: /var/lib/infra/phase/06
-    state: directory
-    mode: "0755"
-
 - name: Stat phase06 facts file
   stat:
     path: /var/lib/infra/phase/06/facts.json
@@ -100,3 +88,13 @@
 - name: Set phase06 status
   set_fact:
     phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase06_status_value }) }}"
+    phase_reason_map: >-
+      {{
+        (hostvars[inventory_hostname].phase_reason_map | default({}))
+        | combine({
+          phase_id: (
+            'ready' if phase06_status_value == 'cur-success'
+            else 'cert-manager release, rollout, or CRD not ready'
+          )
+        })
+      }}

@@ -23,6 +23,14 @@
       set_fact:
         phase_from_idx: "{{ phase_order.index(phase_from) | int }}"
         phase_to_idx: "{{ phase_order.index(phase_to) | int }}"
+    - name: Validate phase range order
+      assert:
+        that:
+          - (phase_from_idx | int) <= (phase_to_idx | int)
+        fail_msg: >-
+          phase range must satisfy phase_from <= phase_to;
+          received phase_from={{ phase_from }}, phase_to={{ phase_to }};
+          allowed={{ phase_order | join(',') }}
   tasks:
     - name: Rollback phases in reverse order
       include_tasks: "phases/phase_{{ item }}.yml"

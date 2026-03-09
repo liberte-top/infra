@@ -25,7 +25,8 @@ jobs:
       INFRA_SSH_HOST: ${{ secrets.INFRA_SSH_HOST }}
       INFRA_SSH_USER: ${{ secrets.INFRA_SSH_USER }}
       INFRA_SSH_PRIVATE_KEY: ${{ secrets.INFRA_SSH_PRIVATE_KEY }}
-      ANSIBLE_HOST_KEY_CHECKING: "False"
+      INFRA_SSH_KNOWN_HOSTS: ${{ secrets.INFRA_SSH_KNOWN_HOSTS }}
+      ANSIBLE_HOST_KEY_CHECKING: "True"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +36,16 @@ jobs:
           umask 077
           printf '%s\n' "$INFRA_SSH_PRIVATE_KEY" > /tmp/infra_ssh_key
           echo "ANSIBLE_PRIVATE_KEY_FILE=/tmp/infra_ssh_key" >> "$GITHUB_ENV"
+
+      - name: Prepare SSH known_hosts
+        run: |
+          umask 077
+          test -n "$INFRA_SSH_KNOWN_HOSTS"
+          printf '%s\n' "$INFRA_SSH_KNOWN_HOSTS" > /tmp/infra_known_hosts
+          {
+            echo 'ANSIBLE_SSH_ARGS=-o UserKnownHostsFile=/tmp/infra_known_hosts -o StrictHostKeyChecking=yes'
+            echo 'GIT_SSH_COMMAND=ssh -o UserKnownHostsFile=/tmp/infra_known_hosts -o StrictHostKeyChecking=yes'
+          } >> "$GITHUB_ENV"
 
       - name: Rollback
         run: |

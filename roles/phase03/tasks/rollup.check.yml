@@ -49,6 +49,7 @@
 - name: Check k3s service status
   command: systemctl is-active k3s
   register: phase03_k3s_service
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase03_facts is defined
@@ -56,6 +57,7 @@
 - name: Check k3s version
   command: /usr/local/bin/k3s --version
   register: phase03_k3s_version_check
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase03_facts is defined
@@ -63,6 +65,7 @@
 - name: Check k3s node status
   command: /usr/local/bin/kubectl get nodes --request-timeout=5s
   register: phase03_k3s_nodes_check
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase03_facts is defined
@@ -80,6 +83,7 @@
   args:
     executable: /bin/bash
   register: phase03_kubeconfig_server_raw
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase03_facts is defined

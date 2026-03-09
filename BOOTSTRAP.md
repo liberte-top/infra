@@ -73,18 +73,35 @@ cd /path/to/infra
 gh secret set INFRA_SSH_HOST --body "<host>"
 gh secret set INFRA_SSH_USER --body "<user>"
 gh secret set INFRA_SSH_PRIVATE_KEY --body "$(cat ~/.ssh/keys/zhaoxi)"
+gh secret set INFRA_SSH_KNOWN_HOSTS --body "$(ssh-keygen -F <host> -f ~/.ssh/known_hosts | grep -v '^#' | head -n 1)"
 ```
+
+6) Prepare the matching local `.env`
+```sh
+cd /path/to/infra
+cp .env.example .env
+# local helper scripts expect base64, unlike CI secrets
+PRIVATE_KEY_B64="$(base64 < ~/.ssh/keys/zhaoxi | tr -d '\n')"
+perl -0pi -e 's|INFRA_SSH_HOST=.*|INFRA_SSH_HOST=<host>|; s|INFRA_SSH_USER=.*|INFRA_SSH_USER=<user>|' .env
+perl -0pi -e "s|INFRA_SSH_PRIVATE_KEY_B64=.*|INFRA_SSH_PRIVATE_KEY_B64=${PRIVATE_KEY_B64}|" .env
+```
+
+- Set `INFRA_SSH_PRIVATE_KEY_B64` in `.env` to the base64 value generated above.
+- This local `.env` format is intentionally different from CI: local helper scripts expect base64, CI secrets store raw private key text.
+- Ensure the matching public key is what you installed as `<ROOT_PUBKEY>`.
 
 ## Verification
 ```sh
 # from local machine
 ssh root@<host> 'whoami'
 ssh root@<host> 'sudo -n true'
+./scripts/ssh.sh
+./scripts/ansible.sh
+```
 
 ## CI Usage
 - `ci.rollup` and `ci.rollback` each run `status` as a final step.
 - Do not run `ci.status` separately (removed to enforce serial execution).
-```
 
 ## Notes
 - This Phase -1 is required if password login is disabled; otherwise CI cannot connect.
