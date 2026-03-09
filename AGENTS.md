@@ -149,8 +149,3 @@ infra/
 - `Permission denied (publickey)`: confirm local private key matches `root_pubkey` in `inventory/group_vars/all.yml`.
 - CI host key verification failure: refresh `INFRA_SSH_KNOWN_HOSTS` from a trusted local `known_hosts` entry for `INFRA_SSH_HOST`.
 - `status` output too terse: rerun the ansible command with `-v` for additional context.
-
-## Main Branch Guard
-- `.task/` is allowed during feature work but must not exist on `main`.
-- Promote useful task insights to permanent docs (for example `AGENTS.md`/`BOOTSTRAP.md`) before merge.
-- `main` is protected by required check `forbid-task-dir-on-main` from workflow `.github/workflows/ci.guard.yml`.
