@@ -53,13 +53,17 @@
   set_fact:
     phase03_k3s_version_resolved: >-
       {{
-        phase03_k3s_installed_version
-        if (phase03_k3s_installed_version is defined and phase03_k3s_installed_version | length > 0)
-        else (
-          phase03_k3s_stable_version
-          if (k3s_version_lock in ['stable', 'latest'])
-          else k3s_version_lock
+        (
+          phase03_k3s_installed_version
+          if (
+            k3s_version_lock in ['stable', 'latest'] and
+            phase03_k3s_installed_version is defined and
+            phase03_k3s_installed_version | length > 0
+          )
+          else phase03_k3s_stable_version
         )
+        if (k3s_version_lock in ['stable', 'latest'])
+        else k3s_version_lock
       }}
 
 - name: Install k3s server
@@ -71,7 +75,6 @@
       sh -'
   args:
     executable: /bin/bash
-    creates: /usr/local/bin/k3s
   when: phase03_k3s_version_resolved is defined and (phase03_k3s_installed_version | default('')) != phase03_k3s_version_resolved
 
 - name: Ensure k3s service is enabled and started

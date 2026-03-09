@@ -31,11 +31,13 @@
   slurp:
     src: /root/.ssh/authorized_keys
   register: phase01_root_keys
+  check_mode: no
   ignore_errors: true
 
 - name: Check effective sshd settings
   command: "sshd -T -C user=root"
   register: phase01_sshd_effective
+  check_mode: no
   changed_when: false
   failed_when: false
 - name: Compute phase01 readiness

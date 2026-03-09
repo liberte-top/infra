@@ -43,6 +43,7 @@
 - name: Check baseline packages installed
   command: "dpkg-query -W -f='${Package} ${Status}\\n' {{ phase00_desired_packages | join(' ') }}"
   register: phase00_pkg_checks
+  check_mode: no
   changed_when: false
   failed_when: false
   when: phase00_facts is defined

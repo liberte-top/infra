@@ -13,14 +13,6 @@
       setup:
         gather_subset:
           - min
-    - name: Debug inventory and var loading (status)
-      debug:
-        msg:
-          inventory_file: "{{ inventory_file | default('') }}"
-          group_names: "{{ group_names }}"
-          k3s_api_endpoint: "{{ k3s_api_endpoint | default('UNDEFINED') }}"
-          root_pubkey: "{{ root_pubkey | default('UNDEFINED') }}"
-          ssh_allow_users: "{{ ssh_allow_users | default('UNDEFINED') }}"
     - name: Validate phase_target
       assert:
         that:
@@ -35,11 +27,24 @@
       vars:
         phase_id: "{{ item }}"
         phase_mode: "status"
-      loop: "{{ phase_order }}"
-      loop_control:
-        index_var: phase_idx
-      when: (phase_idx | int) <= (phase_target_idx | int)
+      loop: "{{ phase_order[0:((phase_target_idx | int) + 1)] }}"
     - name: Output phase status
       debug:
         msg: "phase={{ item.key }} status={{ item.value }}"
       loop: "{{ (phase_status_map | default({})) | dict2items }}"
+    - name: Output non-success reasons
+      debug:
+        msg: "phase={{ item.key }} reason={{ phase_reason_map[item.key] | default('unknown') }}"
+      loop: >-
+        {{
+          (phase_status_map | default({}))
+          | dict2items
+          | rejectattr('value', 'equalto', 'cur-success')
+          | list
+        }}
+    - name: Output status summary
+      debug:
+        msg: >-
+          phase_target={{ phase_target }}
+          phases={{ (phase_status_map | default({})) | length }}
+          healthy={{ (phase_status_map | default({}) | dict2items | selectattr('value', 'equalto', 'cur-success') | list | length) }}
