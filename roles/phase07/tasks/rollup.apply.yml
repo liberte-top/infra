@@ -1,0 +1,88 @@
+---
+- name: Set phase07 kubeconfig path
+  set_fact:
+    phase07_kubeconfig: "{{ argocd_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Install argocd via helm
+  command: >-
+    /usr/local/bin/helm upgrade --install "{{ argocd_release }}"
+    "{{ argocd_chart }}"
+    --repo "{{ argocd_chart_repo }}"
+    --version "{{ argocd_version_lock }}"
+    --namespace "{{ argocd_namespace }}"
+    --create-namespace
+    --set configs.params.server.insecure=true
+    --wait
+    --timeout 300s
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Wait for argocd server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-server --timeout=180s
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Wait for argocd repo-server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-repo-server --timeout=180s
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Wait for argocd application-controller statefulset
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status statefulset/argocd-application-controller --timeout=180s
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Capture UTC timestamp
+  command: date -u +%Y-%m-%dT%H:%M:%SZ
+  register: phase07_now
+  changed_when: false
+
+- name: Build phase07 facts
+  set_fact:
+    phase07_facts:
+      phase: "07"
+      ok: true
+      timestamp: "{{ phase07_now.stdout }}"
+      argocd:
+        release: "{{ argocd_release }}"
+        namespace: "{{ argocd_namespace }}"
+        chart: "{{ argocd_chart }}"
+        version: "{{ argocd_version_lock }}"
+        server_insecure: true
+
+- name: Build phase07 facts compare
+  set_fact:
+    phase07_facts_compact:
+      phase: "07"
+      ok: true
+      argocd:
+        release: "{{ argocd_release }}"
+        namespace: "{{ argocd_namespace }}"
+        chart: "{{ argocd_chart }}"
+        version: "{{ argocd_version_lock }}"
+        server_insecure: true
+    phase07_facts_prev_compact: >-
+      {{
+        (phase07_facts_prev | default({}))
+        | dict2items
+        | rejectattr('key', 'equalto', 'timestamp')
+        | items2dict
+      }}
+
+- name: Check phase07 facts change
+  set_fact:
+    phase07_facts_changed: >-
+      {{
+        (phase07_facts_prev is not defined) or
+        (phase07_facts_prev_compact != phase07_facts_compact)
+      }}
+
+- name: Write phase07 facts file
+  copy:
+    dest: /var/lib/infra/phase/07/facts.json
+    content: "{{ phase07_facts | to_nice_json }}"
+    mode: "0644"
+  when: phase07_facts_changed | default(true)

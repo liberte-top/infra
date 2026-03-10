@@ -35,7 +35,7 @@ infra/
 │   ├── rollup.yml
 │   ├── rollback.yml
 │   ├── status.yml
-│   └── phases/phase_00.yml..phase_06.yml  # Per-phase role dispatch
+│   └── phases/phase_00.yml..phase_07.yml  # Per-phase role dispatch
 ├── roles/                    # Desired state implementation by phase
 │   ├── phase00..phase06/
 │   │   ├── tasks/{rollup,rollback,status}.yml
@@ -58,6 +58,7 @@ infra/
 - `phase04`: maintenance timers (image GC, logrotate, release prune).
 - `phase05`: helm binary lifecycle.
 - `phase06`: cert-manager lifecycle.
+- `phase07`: argocd lifecycle.
 
 ## Phase Runtime Files
 - Persist phase facts in `/var/lib/infra/phase/<id>/facts.json`.
@@ -97,9 +98,9 @@ infra/
 - `./scripts/ansible.sh ansible infra -m ping`
 - `./scripts/kubectl.sh`
 - `./scripts/kubectl.sh get nodes -o wide`
-- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=06`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=06`
-- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=06`
+- `./scripts/ansible.sh ansible-playbook playbooks/status.yml -e phase_target=07`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollup.yml -e phase_from=00 -e phase_to=07`
+- `./scripts/ansible.sh ansible-playbook playbooks/rollback.yml -e phase_from=00 -e phase_to=07`
 
 ## Operation Semantics
 - `status`: inspect the managed state up to `phase_target`; it is intended to be read-only and should be the first command when taking over an environment.
@@ -124,6 +125,7 @@ infra/
 - `04 maint`: logrotate, image GC, and release pruning.
 - `05 helm`: helm binary lifecycle.
 - `06 cert-manager`: cert-manager lifecycle.
+- `07 argocd`: argocd install and control-plane readiness.
 
 ## Kubectl Tunnel Workflow
 - `scripts/kubectl.sh` is strict tunnel mode only.

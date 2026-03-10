@@ -1,0 +1,21 @@
+---
+- name: Uninstall argocd release
+  command: /usr/local/bin/helm uninstall "{{ argocd_release }}" -n "{{ argocd_namespace }}"
+  register: phase07_uninstall
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ argocd_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Remove argocd namespace (optional)
+  command: /usr/local/bin/kubectl delete namespace "{{ argocd_namespace }}"
+  when: argocd_purge_namespace | default(false)
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ argocd_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Remove phase07 facts file
+  file:
+    path: /var/lib/infra/phase/07/facts.json
+    state: absent

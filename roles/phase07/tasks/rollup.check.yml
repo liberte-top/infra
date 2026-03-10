@@ -1,0 +1,119 @@
+---
+- name: Ensure infra phase base dir
+  file:
+    path: /var/lib/infra/phase
+    state: directory
+    mode: "0755"
+
+- name: Ensure phase07 facts dir
+  file:
+    path: /var/lib/infra/phase/07
+    state: directory
+    mode: "0755"
+
+- name: Stat phase07 facts file
+  stat:
+    path: /var/lib/infra/phase/07/facts.json
+  register: phase07_facts_stat
+
+- name: Read phase07 facts file
+  slurp:
+    src: /var/lib/infra/phase/07/facts.json
+  register: phase07_facts_raw
+  when: phase07_facts_stat.stat.exists
+
+- name: Parse phase07 facts
+  when: phase07_facts_raw is defined and phase07_facts_raw.content is defined
+  set_fact:
+    phase07_facts_prev: "{{ phase07_facts_raw.content | b64decode | from_json }}"
+
+- name: Set phase07 kubeconfig path
+  set_fact:
+    phase07_kubeconfig: "{{ argocd_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Check helm binary
+  stat:
+    path: /usr/local/bin/helm
+  register: phase07_helm_bin
+
+- name: Check argocd helm release status
+  command: /usr/local/bin/helm status "{{ argocd_release }}" -n "{{ argocd_namespace }}"
+  register: phase07_helm_status
+  check_mode: no
+  changed_when: false
+  failed_when: false
+  when: phase07_facts_prev is defined and phase07_helm_bin.stat.exists
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-server --timeout=30s
+  register: phase07_server_rollout
+  check_mode: no
+  changed_when: false
+  failed_when: false
+  when: phase07_facts_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd repo-server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-repo-server --timeout=30s
+  register: phase07_repo_server_rollout
+  check_mode: no
+  changed_when: false
+  failed_when: false
+  when: phase07_facts_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd application-controller statefulset
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status statefulset/argocd-application-controller --timeout=30s
+  register: phase07_controller_rollout
+  check_mode: no
+  changed_when: false
+  failed_when: false
+  when: phase07_facts_prev is defined
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Compute phase07 readiness
+  set_fact:
+    phase07_ready: >-
+      {{
+        (phase07_helm_status is defined and (phase07_helm_status.rc | default(1)) == 0) and
+        (
+          (phase07_helm_status.stdout | default('')) is search('STATUS: deployed') or
+          (phase07_helm_status.stdout | default('')) is search('status: deployed')
+        ) and
+        (phase07_server_rollout is defined and (phase07_server_rollout.rc | default(1)) == 0) and
+        (phase07_repo_server_rollout is defined and (phase07_repo_server_rollout.rc | default(1)) == 0) and
+        (phase07_controller_rollout is defined and (phase07_controller_rollout.rc | default(1)) == 0)
+      }}
+  when: phase07_facts_prev is defined
+
+- name: Compute phase07 state match
+  set_fact:
+    phase07_state_matches: >-
+      {{
+        (phase07_facts_prev.phase | default('')) == '07' and
+        (phase07_facts_prev.argocd.release | default('')) == argocd_release and
+        (phase07_facts_prev.argocd.namespace | default('')) == argocd_namespace and
+        (phase07_facts_prev.argocd.chart | default('')) == argocd_chart and
+        (phase07_facts_prev.argocd.version | default('')) == argocd_version_lock and
+        (phase07_facts_prev.argocd.server_insecure | default(false)) == true
+      }}
+  when: phase07_facts_prev is defined
+
+- name: Compute phase07 skip flag
+  set_fact:
+    phase07_skip: >-
+      {{
+        (phase07_facts_prev is defined) and
+        (phase07_state_matches | default(false)) and
+        (phase07_ready | default(false))
+      }}
+
+- name: Skip phase07 rollup when already ready
+  debug:
+    msg: "phase07 already converged; skip apply path"
+  when: phase07_skip | default(false)

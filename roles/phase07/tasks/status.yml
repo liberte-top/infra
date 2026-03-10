@@ -1,0 +1,100 @@
+---
+- name: Compute precheck readiness
+  set_fact:
+    phase07_pre_ready: "{{ (ansible_facts.os_family == 'Debian') and (ansible_facts['user_id'] == 'root') }}"
+
+- name: Stat phase07 facts file
+  stat:
+    path: /var/lib/infra/phase/07/facts.json
+  register: phase07_facts_stat
+
+- name: Read phase07 facts file
+  slurp:
+    src: /var/lib/infra/phase/07/facts.json
+  register: phase07_facts_raw
+  when: phase07_facts_stat.stat.exists
+
+- name: Parse phase07 facts
+  when: phase07_facts_raw is defined and phase07_facts_raw.content is defined
+  set_fact:
+    phase07_facts: "{{ phase07_facts_raw.content | b64decode | from_json }}"
+
+- name: Set phase07 kubeconfig path
+  set_fact:
+    phase07_kubeconfig: "{{ argocd_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Check argocd helm release status
+  command: /usr/local/bin/helm status "{{ argocd_release }}" -n "{{ argocd_namespace }}"
+  register: phase07_helm_status
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-server --timeout=30s
+  register: phase07_server_rollout
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd repo-server deployment
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status deployment/argocd-repo-server --timeout=30s
+  register: phase07_repo_server_rollout
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Check argocd application-controller statefulset
+  command: /usr/local/bin/kubectl -n "{{ argocd_namespace }}" rollout status statefulset/argocd-application-controller --timeout=30s
+  register: phase07_controller_rollout
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: "{{ phase07_kubeconfig }}"
+
+- name: Compute phase07 readiness
+  set_fact:
+    phase07_ready: >-
+      {{
+        (phase07_helm_status is defined and (phase07_helm_status.rc | default(1)) == 0) and
+        (
+          (phase07_helm_status.stdout | default('')) is search('STATUS: deployed') or
+          (phase07_helm_status.stdout | default('')) is search('status: deployed')
+        ) and
+        (phase07_server_rollout is defined and (phase07_server_rollout.rc | default(1)) == 0) and
+        (phase07_repo_server_rollout is defined and (phase07_repo_server_rollout.rc | default(1)) == 0) and
+        (phase07_controller_rollout is defined and (phase07_controller_rollout.rc | default(1)) == 0)
+      }}
+
+- name: Compute phase07 status value
+  set_fact:
+    phase07_status_value: >-
+      {{
+        'pre-not-ready' if not phase07_pre_ready
+        else
+        (
+          'cur-success' if phase07_ready
+          else
+          (
+            'cur-failed' if phase07_facts is defined
+            else 'pre-ready'
+          )
+        )
+      }}
+
+- name: Set phase07 status
+  set_fact:
+    phase_status_map: "{{ (hostvars[inventory_hostname].phase_status_map | default({})) | combine({ phase_id: phase07_status_value }) }}"
+    phase_reason_map: >-
+      {{
+        (hostvars[inventory_hostname].phase_reason_map | default({}))
+        | combine({
+          phase_id: (
+            'ready' if phase07_status_value == 'cur-success'
+            else 'argocd release or control-plane rollout not ready'
+          )
+        })
+      }}
